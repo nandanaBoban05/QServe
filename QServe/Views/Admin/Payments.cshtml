@@ -1,0 +1,48 @@
+@model List<QServe.Models.Payment>
+@{
+    ViewData["Title"] = "Payments";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page">
+    <span class="eyebrow">Received Payments</span>
+    <h1>Payments</h1>
+    <p class="text-muted" style="font-size:13px; margin-top:-8px;">
+        Most recent 100 received payments. Refunding an Online payment calls Razorpay's refund
+        API directly; Cash/Card refunds happen physically at the till — this just records it.
+    </p>
+
+    <div class="card mt-lg">
+    @if (!Model.Any())
+    {
+        <p class="kds-empty">No received payments yet.</p>
+    }
+    else
+    {
+        <table class="data-table">
+            <thead><tr><th>Table</th><th>Order</th><th>Mode</th><th>Amount</th><th>Received</th><th>Action</th></tr></thead>
+            <tbody>
+            @foreach (var payment in Model)
+            {
+                <tr>
+                    <td>@payment.Order?.Table?.TableNumber</td>
+                    <td class="num">#@payment.Order?.OrderID</td>
+                    <td><span class="badge badge-steel">@payment.PaymentMode</span></td>
+                    <td class="num">₹@payment.Amount.ToString("0.00")</td>
+                    <td class="num">@(payment.VerificationTime?.ToString("MMM d, HH:mm") ?? payment.CreatedAt.ToString("MMM d, HH:mm"))</td>
+                    <td>
+                        <form asp-action="RefundPayment" method="post"
+                              onsubmit="return confirm('Refund ₹@payment.Amount.ToString("0.00") for order #@payment.Order?.OrderID?');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="paymentId" value="@payment.PaymentID" />
+                            <button type="submit" class="btn btn-outline btn-sm">Refund</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+    </div>
+</div>

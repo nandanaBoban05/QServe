@@ -1,0 +1,41 @@
+@model QServe.ViewModels.OrderStatusReportDto
+@{
+    ViewData["Title"] = "Order Status Report";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page">
+    <span class="eyebrow">Reports</span>
+    <h1>Order Status Report</h1>
+    <partial name="_ReportsNav" />
+    <partial name="_DateRangeFilter" />
+
+    <div class="stat-grid">
+        <div class="stat-card">
+            <div class="stat-value">@Model.TotalOrders</div>
+            <div class="stat-label">Total Orders</div>
+        </div>
+        <div class="stat-card @(Model.CancellationRatePercent > 10 ? "stat-alert" : "")">
+            <div class="stat-value">@Model.CancellationRatePercent%</div>
+            <div class="stat-label">Cancellation Rate</div>
+        </div>
+    </div>
+
+    <div class="card mt-lg">
+        <h3 style="margin-bottom:12px;">Orders by status</h3>
+        @if (!Model.CountsByStatus.Any())
+        {
+            <p class="kds-empty">No orders in this range.</p>
+        }
+        else
+        {
+            <table class="data-table" style="max-width:360px;">
+                @foreach (var (status, count) in Model.CountsByStatus.OrderByDescending(kv => kv.Value))
+                {
+                    <tr><td>@status</td><td class="num">@count</td></tr>
+                }
+            </table>
+        }
+    </div>
+</div>

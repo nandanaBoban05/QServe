@@ -1,0 +1,30 @@
+<nav class="sidebar">
+    <div class="sidebar__brand">
+        <img src="~/images/logo.png" alt="QServe" class="brand-logo" width="36" height="36" />
+        <div>
+            <span class="sidebar__brand-name">QServe</span>
+            <span class="sidebar__brand-tag">Smart Restaurant Management</span>
+        </div>
+    </div>
+
+    <div class="sidebar__links">
+        <a class="sidebar__link" asp-controller="Admin" asp-action="Index"><svg class="nav-icon" viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="6" height="6" rx="1"/><rect x="11.5" y="2.5" width="6" height="6" rx="1"/><rect x="2.5" y="11.5" width="6" height="6" rx="1"/><rect x="11.5" y="11.5" width="6" height="6" rx="1"/></svg>Dashboard</a>
+        <a class="sidebar__link" asp-controller="Admin" asp-action="Orders"><svg class="nav-icon" viewBox="0 0 20 20"><rect x="3" y="2.5" width="14" height="15" rx="1.5"/><path d="M6.5 7h7M6.5 10.5h7M6.5 14h4"/></svg>Orders</a>
+        <a class="sidebar__link" asp-controller="Admin" asp-action="PaymentQueue"><svg class="nav-icon" viewBox="0 0 20 20"><rect x="2.5" y="5" width="15" height="10.5" rx="1.5"/><path d="M2.5 8.5h15"/><path d="M5.5 12.5h3"/></svg>Payment Queue</a>
+        <a class="sidebar__link" asp-controller="Admin" asp-action="Payments"><svg class="nav-icon" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 6.5v7M12.3 8.2c0-1-1-1.7-2.3-1.7s-2.3.6-2.3 1.6c0 2.2 4.6 1 4.6 3.2 0 1-1 1.6-2.3 1.6s-2.3-.7-2.3-1.7"/></svg>Payments</a>
+        <a class="sidebar__link" asp-controller="Admin" asp-action="Tables"><svg class="nav-icon" viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="15" height="15" rx="1.5"/><path d="M2.5 7.5h15M2.5 12.5h15M7.5 2.5v15M12.5 2.5v15"/></svg>Tables</a>
+        <a class="sidebar__link" asp-controller="AdminMenu" asp-action="Index"><svg class="nav-icon" viewBox="0 0 20 20"><path d="M5 2.5h10a1 1 0 0 1 1 1v13.3a.7.7 0 0 1-1.1.6l-1.9-1.3-1.9 1.3a.7.7 0 0 1-.8 0L8.4 16l-1.9 1.3a.7.7 0 0 1-.8 0l-1.9-1.3-1.9 1.3A.7.7 0 0 1 1 16.8V6a3.5 3.5 0 0 1 3.5-3.5"/><path d="M7 7h6M7 10h6"/></svg>Menu</a>
+        <a class="sidebar__link" asp-controller="AdminMenu" asp-action="Categories"><svg class="nav-icon" viewBox="0 0 20 20"><path d="M2.5 5.8 9 2.4a1.5 1.5 0 0 1 1.4 0l6.1 3.4a1.5 1.5 0 0 1 .8 1.3v5.8a1.5 1.5 0 0 1-.8 1.3L10.4 17.6a1.5 1.5 0 0 1-1.4 0L2.9 14.2a1.5 1.5 0 0 1-.8-1.3V7.1a1.5 1.5 0 0 1 .4-1.3Z"/><circle cx="10" cy="10" r="2"/></svg>Categories</a>
+        <a class="sidebar__link" asp-controller="AdminReports" asp-action="Sales"><svg class="nav-icon" viewBox="0 0 20 20"><path d="M3 17V8M8 17V3M13 17v-6M18 17V10" /></svg>Reports</a>
+        @if (User.IsInRole("Admin"))
+        {
+            <a class="sidebar__link" asp-controller="AdminStaff" asp-action="Index"><svg class="nav-icon" viewBox="0 0 20 20"><circle cx="7" cy="6.5" r="2.5"/><path d="M2 17c0-3 2.2-5 5-5s5 2 5 5"/><circle cx="14.5" cy="7.5" r="2"/><path d="M12.8 12.2c2.2.3 3.7 2 3.7 4.8"/></svg>Staff</a>
+        }
+        <a class="sidebar__link" asp-controller="Admin" asp-action="AuditLog"><svg class="nav-icon" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5"/><path d="M10 5.5V10l3 2"/></svg>Audit Log</a>
+    </div>
+
+    <form asp-controller="Account" asp-action="Logout" method="post" class="sidebar__logout-form">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="sidebar__logout">Log out</button>
+    </form>
+</nav>

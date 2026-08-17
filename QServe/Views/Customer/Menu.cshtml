@@ -1,0 +1,60 @@
+@model List<QServe.Models.MenuCategory>
+@{
+    ViewData["Title"] = "Menu";
+    int tableId = ViewBag.TableId;
+    string token = Context.Session.GetString($"token:table:{tableId}") ?? "";
+    var popularItemIds = (HashSet<int>)ViewBag.PopularItemIds;
+}
+
+<div class="ticket-shell">
+    <div class="ticket-brand">
+        <img src="~/images/logo.png" alt="" width="18" height="18" class="brand-logo brand-logo--plain" />
+        <span>QServe</span>
+    </div>
+    <div class="ticket-topline">
+        <span class="table-stamp">TABLE @ViewBag.TableNumber</span>
+        <a class="cart-tab" href="@Url.Action("Cart", new { tableId })">Cart · @ViewBag.CartCount</a>
+    </div>
+
+    @{ int priorOrderCount = ViewBag.PriorOrderCount; }
+    @if (priorOrderCount > 0)
+    {
+        <a href="@Url.Action("TableOrders", new { tableId })" class="ticket-card" style="display:flex; justify-content:space-between; align-items:center; text-decoration:none; color:inherit; background:var(--turmeric-tint); border-color:var(--turmeric-deep);">
+            <span style="font-size:13.5px;">
+                <strong>@priorOrderCount</strong> order@(priorOrderCount == 1 ? "" : "s") already placed at this table
+            </span>
+            <span class="mono" style="font-size:12px; color:var(--turmeric-deep);">View →</span>
+        </a>
+    }
+
+    @foreach (var category in Model)
+    {
+        <h2 class="course-heading">@category.Name</h2>
+        @foreach (var item in category.Items)
+        {
+            <div class="ticket-card">
+                <div class="ticket-card__row">
+                    @if (!string.IsNullOrWhiteSpace(item.ImageUrl))
+                    {
+                        <img src="@item.ImageUrl" alt="@item.Name" class="ticket-card__thumb" onerror="this.remove()" />
+                    }
+                    <div style="flex:1;">
+                        <div class="ticket-card__name">@item.Name</div>
+                        @if (popularItemIds.Contains(item.ItemID))
+                        {
+                            <div class="ticket-card__meta"><span class="stamp stamp-turmeric">Popular</span></div>
+                        }
+                    </div>
+                    <div class="ticket-card__price">₹@item.Price.ToString("0.00")</div>
+                </div>
+                <form asp-action="AddToCart" asp-route-tableId="@tableId" method="post" class="add-row">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="itemId" value="@item.ItemID" />
+                    <input type="number" name="quantity" value="1" min="1" max="50" class="qty-input" />
+                    <input type="text" name="customization" placeholder="e.g. no onions" class="custom-input" />
+                    <button type="submit" class="btn btn-primary btn-sm">Add</button>
+                </form>
+            </div>
+        }
+    }
+</div>

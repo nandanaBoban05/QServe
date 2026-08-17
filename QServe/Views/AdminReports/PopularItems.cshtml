@@ -1,0 +1,60 @@
+@model List<QServe.ViewModels.PopularItemDto>
+@{
+    ViewData["Title"] = "Popular Items";
+    var byRevenue = (List<QServe.ViewModels.PopularItemDto>)ViewBag.ByRevenue;
+}
+
+<partial name="_AdminNav" />
+
+<div class="page">
+    <span class="eyebrow">Reports</span>
+    <h1>Popular Items</h1>
+    <partial name="_ReportsNav" />
+    <partial name="_DateRangeFilter" />
+
+    <p class="text-muted" style="font-size:13px; margin-top:-8px;">
+        Ranks actual sales in this date range — a different, complementary view from the
+        "Popular" badges on the customer menu, which score all-time + recent volume together.
+    </p>
+
+    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+        <div class="card" style="flex:1; min-width:280px;">
+            <h3 style="margin-bottom:12px;">Top 10 by quantity sold</h3>
+            @if (!Model.Any())
+            {
+                <p class="kds-empty">No sales in this range.</p>
+            }
+            else
+            {
+                <table class="data-table">
+                    <thead><tr><th>Item</th><th>Qty Sold</th></tr></thead>
+                    <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr><td>@item.ItemName</td><td class="num">@item.QuantitySold</td></tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div>
+        <div class="card" style="flex:1; min-width:280px;">
+            <h3 style="margin-bottom:12px;">Top 10 by revenue</h3>
+            @if (!byRevenue.Any())
+            {
+                <p class="kds-empty">No sales in this range.</p>
+            }
+            else
+            {
+                <table class="data-table">
+                    <thead><tr><th>Item</th><th>Revenue</th></tr></thead>
+                    <tbody>
+                    @foreach (var item in byRevenue)
+                    {
+                        <tr><td>@item.ItemName</td><td class="num">₹@item.Revenue.ToString("0.00")</td></tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>

@@ -1,0 +1,15 @@
+@{
+    ViewData["Title"] = "Access Denied";
+}
+
+<div class="page page--auth">
+    <div class="auth-card" style="text-align:center;">
+        <img src="~/images/logo.png" alt="QServe" class="brand-logo brand-logo--plain" width="44" height="44" style="margin:0 auto 12px;" />
+        <span class="stamp">Access Denied</span>
+        <p class="text-muted" style="margin:16px 0 20px; font-size:14px;">You don't have permission to view this page.</p>
+        <form asp-controller="Account" asp-action="Logout" method="post">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline btn-block">Log Out</button>
+        </form>
+    </div>
+</div>

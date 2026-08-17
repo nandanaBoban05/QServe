@@ -1,0 +1,59 @@
+@model QServe.Services.RazorpayCheckoutInfo
+@{
+    ViewData["Title"] = "Pay for your order";
+}
+
+<div class="page page--auth" style="text-align:center;">
+    <div class="auth-card">
+        <img src="~/images/logo.png" alt="QServe" class="brand-logo brand-logo--plain" width="40" height="40" style="margin:0 auto 10px;" />
+        <span class="table-stamp mono">ORDER #@Model.OrderId.ToString("D6")</span>
+        <p class="mono" style="font-size:22px; margin:16px 0 22px;">₹@((Model.AmountInPaise / 100m).ToString("0.00"))</p>
+
+        <button id="pay-btn" class="btn btn-primary btn-block" style="padding:14px;">Pay Now</button>
+        <p id="pay-status" style="color:var(--tamarind); font-size:13px; margin-top:12px;"></p>
+    </div>
+</div>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+    document.getElementById("pay-btn").addEventListener("click", function () {
+        const options = {
+            key: "@Model.KeyId",
+            amount: "@Model.AmountInPaise",
+            currency: "@Model.Currency",
+            name: "QServe",
+            description: "Order #@Model.OrderId",
+            order_id: "@Model.RazorpayOrderId",
+            handler: async function (response) {
+                const res = await fetch("/payment/confirm", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: new URLSearchParams({
+                        orderId: "@Model.OrderId",
+                        razorpayOrderId: response.razorpay_order_id,
+                        razorpayPaymentId: response.razorpay_payment_id,
+                        razorpaySignature: response.razorpay_signature
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    window.location.href = "/order/status/@Model.OrderId";
+                } else {
+                    document.getElementById("pay-status").textContent = "Payment verification failed. Please contact staff.";
+                }
+            },
+            modal: {
+                ondismiss: function () {
+                    fetch("/payment/failed", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                        body: new URLSearchParams({ orderId: "@Model.OrderId" })
+                    });
+                    document.getElementById("pay-status").textContent = "Payment cancelled.";
+                }
+            }
+        };
+        const rzp = new Razorpay(options);
+        rzp.open();
+    });
+</script>

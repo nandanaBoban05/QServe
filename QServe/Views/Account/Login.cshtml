@@ -1,0 +1,50 @@
+@{
+    ViewData["Title"] = "Staff Login";
+}
+
+<div class="page page--auth">
+    <div class="auth-card" style="text-align:center;">
+        <img src="~/images/logo.png" alt="QServe" class="brand-logo brand-logo--plain" width="64" height="64" style="margin:0 auto 12px;" />
+        <h1 style="font-size:22px; margin-bottom:2px;">QServe</h1>
+        <p class="eyebrow" style="margin-bottom:22px;">Smart Restaurant Management</p>
+
+        <div style="text-align:left;">
+            @if (TempData["LoginMessage"] is string loginMessage)
+            {
+                <div class="card" style="background:var(--curry-tint); border-color:#b9caae; padding:10px 14px; margin-bottom:14px;">
+                    <span style="font-size:13px;">@loginMessage</span>
+                </div>
+            }
+
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="validation-summary-errors">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <p>@error.ErrorMessage</p>
+                    }
+                </div>
+            }
+
+            <form asp-controller="Account" asp-action="Login" method="post">
+                @Html.AntiForgeryToken()
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required autofocus />
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required />
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">Log In</button>
+            </form>
+
+            <p style="text-align:center; margin-top:14px;">
+                <a asp-controller="Account" asp-action="ForgotPassword" style="font-size:13px; color:var(--ink-soft);">Forgot password?</a>
+            </p>
+        </div>
+    </div>
+</div>

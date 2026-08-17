@@ -1,0 +1,94 @@
+@model List<QServe.Models.Order>
+@{
+    ViewData["Title"] = "Kitchen Display";
+}
+
+<nav class="topbar">
+    <span class="topbar__brand" style="display:flex; align-items:center; gap:8px;">
+        <img src="~/images/logo.png" alt="QServe" class="brand-logo" width="24" height="24" />
+        QServe — Kitchen
+    </span>
+    <span class="topbar__spacer"></span>
+    <form asp-controller="Account" asp-action="Logout" method="post" style="display:inline;">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="topbar__logout">Log out</button>
+    </form>
+</nav>
+
+<div class="page">
+    <div class="page-head">
+        <div>
+            <span class="eyebrow">Live Queue</span>
+            <h1>Kitchen</h1>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <span class="badge tier-quick" style="padding:4px 10px;">Quick</span>
+            <span class="badge tier-regular" style="padding:4px 10px;">Regular</span>
+            <span class="badge tier-heavy" style="padding:4px 10px;">Heavy</span>
+        </div>
+    </div>
+
+    <div class="kds-grid">
+    @foreach (var order in Model)
+    {
+        <div class="kds-card tier-@order.OrderType.ToLower()" data-order-id="@order.OrderID">
+            <div class="kds-card__head">
+                <span>@order.OrderType</span>
+                <span>Table @order.Table?.TableNumber</span>
+            </div>
+            <ul>
+                @foreach (var line in order.OrderItems)
+                {
+                    <li>
+                        @line.Quantity &times; @line.Item?.Name
+                        @if (!string.IsNullOrWhiteSpace(line.Customization))
+                        {
+                            <div class="custom-note">@line.Customization</div>
+                        }
+                    </li>
+                }
+            </ul>
+            <div class="kds-card__foot">
+                <span class="mono" style="font-size:11px; opacity:0.85;">@order.OrderStatus</span>
+                @if (order.OrderStatus == "Approved")
+                {
+                    <form asp-action="MarkPreparing" asp-route-orderId="@order.OrderID" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-primary btn-sm">Start Preparing</button>
+                    </form>
+                }
+                else if (order.OrderStatus == "Preparing")
+                {
+                    <form asp-action="MarkReady" asp-route-orderId="@order.OrderID" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-primary btn-sm">Mark Ready</button>
+                    </form>
+                }
+                else if (order.OrderStatus == "Ready")
+                {
+                    <form asp-action="MarkServed" asp-route-orderId="@order.OrderID" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-primary btn-sm">Mark Served</button>
+                    </form>
+                }
+            </div>
+        </div>
+    }
+    </div>
+
+    @if (!Model.Any())
+    {
+        <p class="kds-empty">No active orders right now.</p>
+    }
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+<script>
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/hubs/kitchen")
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on("OrderStatusUpdate", () => window.location.reload());
+    connection.start().catch(err => console.error("SignalR connection failed:", err));
+</script>

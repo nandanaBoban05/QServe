@@ -1,0 +1,73 @@
+@model List<QServe.Models.RestaurantTable>
+@{
+    ViewData["Title"] = "Tables & QR Codes";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page page--narrow">
+    <span class="eyebrow">Floor</span>
+    <h1>Tables &amp; QR Codes</h1>
+
+    @if (TempData["TableError"] is string errorMessage)
+    {
+        <div class="validation-summary-errors mt-lg" style="margin-bottom:0;"><p>@errorMessage</p></div>
+    }
+    @if (TempData["TableSuccess"] is string successMessage)
+    {
+        <div class="card mt-lg" style="background:var(--curry-tint); border-color:#b9caae; padding:10px 16px;">
+            <span style="font-size:13.5px;">@successMessage</span>
+        </div>
+    }
+
+    <div class="card mt-lg">
+        <table class="data-table">
+            <thead>
+                <tr><th>Table</th><th>Capacity</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var table in Model)
+            {
+                <tr class="@(table.IsActive ? "" : "is-dim")">
+                    <td class="num">@table.TableNumber</td>
+                    <td class="num">@table.Capacity</td>
+                    <td>
+                        <span class="badge @(table.IsActive ? "badge-curry" : "badge-steel")">@(table.IsActive ? "Active" : "Inactive")</span>
+                    </td>
+                    <td>
+                        <a href="@Url.Action("TableQr", new { tableId = table.TableID })" target="_blank" class="btn-ghost">QR</a>
+                        <form asp-action="RegenerateQr" method="post" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="tableId" value="@table.TableID" />
+                            <button type="submit" class="btn-ghost" style="border:none; background:none; cursor:pointer;">Regenerate</button>
+                        </form>
+                        <form asp-action="ToggleTableActive" method="post" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="tableId" value="@table.TableID" />
+                            <button type="submit" class="btn-ghost" style="border:none; background:none; cursor:pointer;">
+                                @(table.IsActive ? "Deactivate" : "Activate")
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card mt-lg">
+        <h3 style="margin-bottom:14px;">Add a table</h3>
+        <form asp-action="CreateTable" method="post" class="field-row">
+            @Html.AntiForgeryToken()
+            <div class="form-group" style="margin-bottom:0;">
+                <label>Table number</label>
+                <input type="text" name="tableNumber" required style="width:140px;" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label>Capacity</label>
+                <input type="number" name="capacity" value="4" min="1" style="width:80px;" />
+            </div>
+            <button type="submit" class="btn btn-primary">Add Table</button>
+        </form>
+    </div>
+</div>

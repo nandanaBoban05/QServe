@@ -1,0 +1,45 @@
+@model QServe.ViewModels.DailySalesSummaryDto
+@{
+    ViewData["Title"] = "Daily Sales Summary";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page">
+    <span class="eyebrow">Reports</span>
+    <h1>Daily Sales Summary</h1>
+    <partial name="_ReportsNav" />
+    <partial name="_DateRangeFilter" />
+
+    <div class="stat-grid">
+        <div class="stat-card">
+            <div class="stat-value">₹@Model.Revenue.ToString("0.00")</div>
+            <div class="stat-label">Revenue</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@Model.OrderCount</div>
+            <div class="stat-label">Orders</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">₹@Model.AvgOrderValue.ToString("0.00")</div>
+            <div class="stat-label">Avg Order Value</div>
+        </div>
+    </div>
+
+    <div class="card mt-lg">
+        <h3 style="margin-bottom:12px;">Revenue by payment mode</h3>
+        @if (!Model.RevenueByPaymentMode.Any())
+        {
+            <p class="kds-empty">No orders in this range.</p>
+        }
+        else
+        {
+            <table class="data-table" style="max-width:360px;">
+                @foreach (var (mode, amount) in Model.RevenueByPaymentMode)
+                {
+                    <tr><td>@mode</td><td class="num">₹@amount.ToString("0.00")</td></tr>
+                }
+            </table>
+        }
+    </div>
+</div>

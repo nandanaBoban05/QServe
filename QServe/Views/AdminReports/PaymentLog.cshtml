@@ -1,0 +1,39 @@
+@model List<QServe.ViewModels.PaymentVerificationLogEntryDto>
+@{
+    ViewData["Title"] = "Payment Verification Log";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page">
+    <span class="eyebrow">Reports</span>
+    <h1>Payment Verification Log</h1>
+    <partial name="_ReportsNav" />
+    <partial name="_DateRangeFilter" />
+
+    <div class="card">
+    @if (!Model.Any())
+    {
+        <p class="kds-empty">No offline payment decisions in this range.</p>
+    }
+    else
+    {
+        <table class="data-table">
+            <thead><tr><th>Table</th><th>Mode</th><th>Amount</th><th>Decision</th><th>By</th><th>When</th></tr></thead>
+            <tbody>
+            @foreach (var entry in Model)
+            {
+                <tr>
+                    <td>@entry.TableNumber</td>
+                    <td><span class="badge badge-steel">@entry.PaymentMode</span></td>
+                    <td class="num">₹@entry.Amount.ToString("0.00")</td>
+                    <td><span class="badge @(entry.Approved ? "badge-curry" : "badge-tamarind")">@(entry.Approved ? "Approved" : "Rejected")</span></td>
+                    <td>@entry.VerifiedByName</td>
+                    <td class="num">@entry.VerificationTime?.ToString("MMM d, HH:mm")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+    </div>
+</div>

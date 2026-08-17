@@ -1,0 +1,142 @@
+@model QServe.ViewModels.AdminDashboardStats
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page">
+    <span class="eyebrow">Overview</span>
+    <h1>Dashboard</h1>
+
+    <div class="stat-grid mt-lg">
+        <div class="stat-card">
+            <div class="stat-value">@Model.TodayOrderCount</div>
+            <div class="stat-label">Orders Today</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">₹@Model.TodayRevenue.ToString("0.00")</div>
+            <div class="stat-label">Revenue Today</div>
+        </div>
+        <div class="stat-card @(Model.PendingVerificationCount > 0 ? "stat-alert" : "")">
+            <div class="stat-value">@Model.PendingVerificationCount</div>
+            <div class="stat-label">Awaiting Payment Verification</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@Model.ActiveOrderCount</div>
+            <div class="stat-label">Active Orders Right Now</div>
+        </div>
+    </div>
+
+    <div class="stat-grid mt-lg" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+        <div class="stat-card stat-card--sm">
+            <div class="stat-value" style="font-size:20px;">@Model.ActiveTableCount</div>
+            <div class="stat-label">Active Tables</div>
+        </div>
+        <div class="stat-card stat-card--sm">
+            <div class="stat-value" style="font-size:20px;">@Model.MenuItemCount</div>
+            <div class="stat-label">Menu Items</div>
+        </div>
+        <div class="stat-card stat-card--sm">
+            <div class="stat-value" style="font-size:20px;">@Model.ActiveStaffCount</div>
+            <div class="stat-label">Active Staff</div>
+        </div>
+    </div>
+
+    <div class="dash-grid mt-lg">
+        <div class="card">
+            <h3 style="margin-bottom:14px;">Last 7 Days</h3>
+            <canvas id="trendChart" height="180"></canvas>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom:12px;">Recent Activity</h3>
+            @if (!Model.RecentActivity.Any())
+            {
+                <p class="kds-empty">Nothing recorded yet.</p>
+            }
+            else
+            {
+                <ul class="activity-feed">
+                    @foreach (var item in Model.RecentActivity)
+                    {
+                        <li>
+                            <span class="activity-dot"></span>
+                            <div>
+                                <div style="font-size:13px;">
+                                    <strong>@(item.PerformedByName ?? "System")</strong>
+                                    @item.Action.Replace("_", " ")
+                                    <span class="text-muted">· @item.EntityType #@item.EntityID</span>
+                                </div>
+                                <div class="text-muted mono" style="font-size:11px;">@item.Timestamp.ToString("MMM d, HH:mm")</div>
+                            </div>
+                        </li>
+                    }
+                </ul>
+                <a asp-action="AuditLog" style="font-size:12px;">View full audit log →</a>
+            }
+        </div>
+    </div>
+
+    <h3 class="mt-lg" style="margin-bottom:12px;">Quick Actions</h3>
+    <div class="quick-actions">
+        <a class="quick-action" asp-controller="Admin" asp-action="Orders">
+            <strong>Live Orders</strong>
+            <span>Monitor everything in progress</span>
+        </a>
+        <a class="quick-action" asp-controller="Admin" asp-action="PaymentQueue">
+            <strong>Verify Payments</strong>
+            <span>@Model.PendingVerificationCount waiting</span>
+        </a>
+        <a class="quick-action" asp-controller="AdminMenu" asp-action="CreateItem">
+            <strong>+ Add Menu Item</strong>
+            <span>Expand today's menu</span>
+        </a>
+        <a class="quick-action" asp-controller="Admin" asp-action="Tables">
+            <strong>Manage Tables</strong>
+            <span>QR codes &amp; floor setup</span>
+        </a>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+    const labels = [@Html.Raw(string.Join(",", Model.WeekTrend.Select(d => $"'{d.Date:ddd}'")))];
+    const revenue = [@string.Join(",", Model.WeekTrend.Select(d => d.Revenue.ToString(System.Globalization.CultureInfo.InvariantCulture)))];
+    const orderCounts = [@string.Join(",", Model.WeekTrend.Select(d => d.OrderCount))];
+
+    const ctx = document.getElementById('trendChart');
+    new Chart(ctx, {
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    type: 'bar',
+                    label: 'Revenue (₹)',
+                    data: revenue,
+                    backgroundColor: '#CC9A06',
+                    borderRadius: 4,
+                    yAxisID: 'y'
+                },
+                {
+                    type: 'line',
+                    label: 'Orders',
+                    data: orderCounts,
+                    borderColor: '#8C2F1B',
+                    backgroundColor: '#8C2F1B',
+                    tension: 0.3,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                y: { position: 'left', beginAtZero: true, title: { display: true, text: 'Revenue (₹)' } },
+                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: 'Orders' }, ticks: { stepSize: 1 } }
+            },
+            plugins: { legend: { position: 'bottom', labels: { font: { family: 'IBM Plex Sans' } } } }
+        }
+    });
+</script>

@@ -1,0 +1,51 @@
+@model QServe.Models.User
+@{
+    ViewData["Title"] = "Edit Staff Account";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page page--narrow">
+    <span class="eyebrow">Admin Only</span>
+    <h1>Edit Staff Account</h1>
+
+    <div class="card mt-lg">
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="validation-summary-errors">
+                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <p>@error.ErrorMessage</p>
+                }
+            </div>
+        }
+
+        <form asp-action="Edit" asp-route-userId="@Model.UserID" method="post">
+            @Html.AntiForgeryToken()
+
+            <div class="form-group">
+                <label>Full name</label>
+                <input type="text" name="fullName" value="@Model.FullName" required />
+            </div>
+
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" value="@Model.Email" required />
+            </div>
+
+            <div class="form-group">
+                <label>Role</label>
+                <select name="role" required>
+                    @foreach (var r in new[] { "Kitchen", "Manager", "Admin" })
+                    {
+                        <option value="@r" selected="@(r == Model.Role)">@r</option>
+                    }
+                </select>
+            </div>
+
+            <p class="text-muted" style="font-size:12px;">To change this account's password, use "Reset Password" from the staff list instead.</p>
+
+            <button type="submit" class="btn btn-primary btn-block">Save Changes</button>
+        </form>
+    </div>
+</div>

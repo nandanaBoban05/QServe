@@ -1,0 +1,52 @@
+@{
+    ViewData["Title"] = "New Staff Account";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page page--narrow">
+    <span class="eyebrow">Admin Only</span>
+    <h1>New Staff Account</h1>
+
+    <div class="card mt-lg">
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="validation-summary-errors">
+                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <p>@error.ErrorMessage</p>
+                }
+            </div>
+        }
+
+        <form asp-action="Create" method="post">
+            @Html.AntiForgeryToken()
+
+            <div class="form-group">
+                <label>Full name</label>
+                <input type="text" name="fullName" required />
+            </div>
+
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" required />
+            </div>
+
+            <div class="form-group">
+                <label>Temporary password</label>
+                <input type="password" name="password" required minlength="8" />
+            </div>
+
+            <div class="form-group">
+                <label>Role</label>
+                <select name="role" required>
+                    <option value="Kitchen">Kitchen</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Admin">Admin</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+        </form>
+    </div>
+</div>

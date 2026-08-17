@@ -1,0 +1,59 @@
+@model List<QServe.ViewModels.KitchenThroughputDto>
+@{
+    ViewData["Title"] = "Kitchen Throughput";
+    var peakHours = (List<QServe.ViewModels.PeakHourDto>)ViewBag.PeakHours;
+}
+
+<partial name="_AdminNav" />
+
+<div class="page">
+    <span class="eyebrow">Reports</span>
+    <h1>Kitchen Throughput</h1>
+    <partial name="_ReportsNav" />
+    <partial name="_DateRangeFilter" />
+
+    <div class="card">
+        <h3 style="margin-bottom:6px;">Average prep time by item type</h3>
+        <p class="text-muted" style="font-size:12.5px; margin-top:0; margin-bottom:14px;">
+            Prep time = ServedAt − ApprovedAt at the order level. An order spanning multiple
+            item types credits its full duration to each type present.
+        </p>
+        @if (!Model.Any())
+        {
+            <p class="kds-empty">No completed orders in this range.</p>
+        }
+        else
+        {
+            <table class="data-table" style="max-width:480px;">
+                <thead><tr><th>Item Type</th><th>Avg Prep (min)</th><th>Orders</th></tr></thead>
+                <tbody>
+                @foreach (var row in Model)
+                {
+                    <tr><td>@row.ItemType</td><td class="num">@row.AvgPrepMinutes</td><td class="num">@row.OrdersCompleted</td></tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <div class="card mt-lg">
+        <h3 style="margin-bottom:14px;">Orders by hour of day</h3>
+        @if (!peakHours.Any())
+        {
+            <p class="kds-empty">No orders in this range.</p>
+        }
+        else
+        {
+            <div style="display:flex; align-items:flex-end; gap:6px; height:120px;">
+                @{ var maxCount = peakHours.Max(h => h.OrderCount); }
+                @foreach (var hour in peakHours)
+                {
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:flex-end; font-family:var(--font-mono); font-size:10px; color:var(--ink-faint);">
+                        <div style="width:14px; background:var(--turmeric-deep); border-radius:2px 2px 0 0; min-height:2px; height:@((maxCount > 0 ? hour.OrderCount * 100 / maxCount : 0))px;"></div>
+                        <span>@hour.Hour:00</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>

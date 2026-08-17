@@ -1,0 +1,53 @@
+@model List<QServe.Models.Order>
+@{
+    ViewData["Title"] = "Order Monitor";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page">
+    <span class="eyebrow">Live</span>
+    <h1>Active Orders</h1>
+
+    <div class="card mt-lg">
+    @if (!Model.Any())
+    {
+        <p class="kds-empty">No active orders right now.</p>
+    }
+    else
+    {
+        <table class="data-table">
+            <thead>
+                <tr><th>Order</th><th>Table</th><th>Status</th><th>Tier</th><th>Total</th><th>Placed</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var order in Model)
+            {
+                <tr>
+                    <td class="num">#@order.OrderID</td>
+                    <td>@order.Table?.TableNumber</td>
+                    <td><span class="badge badge-steel">@order.OrderStatus</span></td>
+                    <td>
+                        <span class="badge @(order.OrderType == "Quick" ? "badge-curry" : order.OrderType == "Heavy" ? "badge-tamarind" : "badge-turmeric")">@order.OrderType</span>
+                    </td>
+                    <td class="num">₹@order.TotalAmount.ToString("0.00")</td>
+                    <td class="num">@order.CreatedAt.ToString("HH:mm")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+<script>
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/hubs/kitchen")
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on("OrderStatusUpdate", () => window.location.reload());
+    connection.on("PaymentPendingVerification", () => window.location.reload());
+    connection.start().catch(err => console.error("SignalR connection failed:", err));
+</script>

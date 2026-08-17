@@ -1,0 +1,70 @@
+@model QServe.Models.MenuItem
+@{
+    ViewData["Title"] = "Edit Menu Item";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page page--narrow">
+    <span class="eyebrow">Menu</span>
+    <h1>Edit Item</h1>
+
+    <div class="card mt-lg">
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="validation-summary-errors">
+                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <p>@error.ErrorMessage</p>
+                }
+            </div>
+        }
+
+        <form asp-action="EditItem" asp-route-itemId="@Model.ItemID" method="post">
+            @Html.AntiForgeryToken()
+
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" name="Name" value="@Model.Name" required />
+            </div>
+
+            <div class="form-group">
+                <label>Category</label>
+                <select name="CategoryID" required>
+                    @foreach (var category in (List<QServe.Models.MenuCategory>)ViewBag.Categories)
+                    {
+                        <option value="@category.CategoryID" selected="@(category.CategoryID == Model.CategoryID)">@category.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Item Type <span class="text-muted" style="text-transform:none; font-weight:400;">— feeds the kitchen priority classifier</span></label>
+                <select name="ItemType" required>
+                    @foreach (var type in new[] { "Beverage", "Quick", "Cooked", "Dessert" })
+                    {
+                        <option value="@type" selected="@(type == Model.ItemType)">@type</option>
+                    }
+                </select>
+            </div>
+
+            <div class="field-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Price (₹)</label>
+                    <input type="number" name="Price" value="@Model.Price" step="0.01" min="0.01" required />
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Prep Time (min)</label>
+                    <input type="number" name="PrepTimeMinutes" value="@Model.PrepTimeMinutes" min="1" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Image URL (optional)</label>
+                <input type="text" name="ImageUrl" value="@Model.ImageUrl" />
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Save Changes</button>
+        </form>
+    </div>
+</div>

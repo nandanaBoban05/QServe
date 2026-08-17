@@ -1,0 +1,32 @@
+@model List<QServe.ViewModels.TableUtilisationDto>
+@{
+    ViewData["Title"] = "Table Utilisation Report";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page page--narrow">
+    <span class="eyebrow">Reports</span>
+    <h1>Table Utilisation</h1>
+    <partial name="_ReportsNav" />
+    <partial name="_DateRangeFilter" />
+
+    <div class="card">
+    @if (!Model.Any())
+    {
+        <p class="kds-empty">No orders in this range.</p>
+    }
+    else
+    {
+        <table class="data-table">
+            <thead><tr><th>Table</th><th>Orders</th><th>Revenue</th></tr></thead>
+            <tbody>
+            @foreach (var table in Model)
+            {
+                <tr><td>@table.TableNumber</td><td class="num">@table.OrderCount</td><td class="num">₹@table.Revenue.ToString("0.00")</td></tr>
+            }
+            </tbody>
+        </table>
+    }
+    </div>
+</div>

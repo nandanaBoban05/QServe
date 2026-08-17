@@ -1,0 +1,62 @@
+@model List<QServe.Models.Payment>
+@{
+    ViewData["Title"] = "Payment Verification Queue";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page page--narrow">
+    <span class="eyebrow">Verification</span>
+    <h1>Payment Queue</h1>
+
+    <div class="card mt-lg">
+    @if (!Model.Any())
+    {
+        <p class="kds-empty">Nothing waiting on verification right now.</p>
+    }
+    else
+    {
+        <table class="data-table">
+            <thead>
+                <tr><th>Table</th><th>Mode</th><th>Amount</th><th>Placed</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var payment in Model)
+            {
+                <tr>
+                    <td>@payment.Order?.Table?.TableNumber</td>
+                    <td><span class="badge badge-steel">@payment.PaymentMode</span></td>
+                    <td class="num">₹@payment.Amount.ToString("0.00")</td>
+                    <td class="num">@payment.CreatedAt.ToString("HH:mm")</td>
+                    <td>
+                        <form asp-action="VerifyPayment" method="post" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="paymentId" value="@payment.PaymentID" />
+                            <input type="hidden" name="approve" value="true" />
+                            <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+                        </form>
+                        <form asp-action="VerifyPayment" method="post" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="paymentId" value="@payment.PaymentID" />
+                            <input type="hidden" name="approve" value="false" />
+                            <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+<script>
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/hubs/kitchen")
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on("PaymentPendingVerification", () => window.location.reload());
+    connection.start().catch(err => console.error("SignalR connection failed:", err));
+</script>

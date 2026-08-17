@@ -1,0 +1,92 @@
+@model QServe.Models.Order
+@{
+    ViewData["Title"] = "Order Status";
+}
+
+<div class="ticket-shell" style="text-align:center;">
+    <div class="ticket-brand">
+        <img src="~/images/logo.png" alt="" width="18" height="18" class="brand-logo brand-logo--plain" />
+        <span>QServe</span>
+    </div>
+    <span class="eyebrow">Order No.</span>
+    <h1 class="mono" style="font-size:26px;">#@Model.OrderID.ToString("D6")</h1>
+    <p class="text-muted mono" style="font-size:13px; margin-top:-6px;">Table @Model.Table?.TableNumber</p>
+
+    <div class="punch-tracker">
+        @foreach (var step in new[] { "Approved", "Preparing", "Ready", "Served" })
+        {
+            <div class="punch-step @(IsAtOrPast(Model.OrderStatus, step) ? "done" : "")" data-step="@step">
+                <div class="punch-dot"></div>
+                <span class="punch-label">@step</span>
+            </div>
+        }
+    </div>
+
+    <p style="font-size:14px;">Current status: <strong id="status-text">@Model.OrderStatus</strong></p>
+
+    @if (Model.OrderStatus is "PendingPayment" or "AwaitingVerification")
+    {
+        <p class="text-muted" style="font-size:13px;">Waiting on payment confirmation — this page updates automatically once it's approved.</p>
+    }
+    @if (Model.OrderStatus == "Cancelled")
+    {
+        <p style="color:var(--tamarind); font-size:13px;">This order was cancelled. Please speak to a staff member.</p>
+    }
+
+    <div class="mt-lg" style="display:flex; flex-direction:column; gap:8px;">
+        <a href="@Url.Action("Menu", new { tableId = Model.TableID })" class="btn btn-primary btn-block" style="padding:13px;">
+            + Order More
+        </a>
+        @if ((int)ViewBag.SessionOrderCount > 1)
+        {
+            <a href="@Url.Action("TableOrders", new { tableId = Model.TableID })" class="btn btn-outline btn-block">
+                View All Your Orders
+            </a>
+        }
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+<script>
+    // Module 7: genuine live push via KitchenHub, replacing the earlier polling fallback.
+    // The filter on data.orderId matters — this hub broadcasts every order's updates to
+    // every connected client (see RealtimeNotifier), so each Status page ignores updates
+    // for orders that aren't its own.
+    const orderId = @Model.OrderID;
+    const stepOrder = ["Approved", "Preparing", "Ready", "Served"];
+
+    function applyStatus(status) {
+        document.getElementById("status-text").textContent = status;
+        document.querySelectorAll(".punch-step").forEach(el => {
+            const idx = stepOrder.indexOf(el.dataset.step);
+            const currentIdx = stepOrder.indexOf(status);
+            el.classList.toggle("done", currentIdx >= 0 && idx <= currentIdx);
+        });
+    }
+
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/hubs/kitchen")
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on("OrderStatusUpdate", (data) => {
+        if (data.orderID === orderId) applyStatus(data.newStatus);
+    });
+
+    connection.start().catch(err => {
+        console.error("SignalR connection failed, falling back to a one-off refresh:", err);
+        fetch(`/order/status/${orderId}/json`)
+            .then(res => res.ok ? res.json() : null)
+            .then(data => { if (data) applyStatus(data.status); });
+    });
+</script>
+
+@functions {
+    bool IsAtOrPast(string current, string step)
+    {
+        var order = new[] { "Approved", "Preparing", "Ready", "Served" };
+        var currentIdx = Array.IndexOf(order, current);
+        var stepIdx = Array.IndexOf(order, step);
+        return currentIdx >= 0 && stepIdx <= currentIdx;
+    }
+}

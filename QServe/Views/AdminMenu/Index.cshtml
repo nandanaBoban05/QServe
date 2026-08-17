@@ -1,0 +1,48 @@
+@model List<QServe.Models.MenuItem>
+@{
+    ViewData["Title"] = "Menu Items";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page">
+    <div class="page-head">
+        <div>
+            <span class="eyebrow">Menu</span>
+            <h1>Items</h1>
+        </div>
+        <a asp-action="CreateItem" class="btn btn-primary">+ New Item</a>
+    </div>
+
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr><th>Name</th><th>Category</th><th>Type</th><th>Price</th><th>Available</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model)
+            {
+                <tr class="@(item.IsAvailable ? "" : "is-dim")">
+                    <td>@item.Name</td>
+                    <td>@item.Category?.Name</td>
+                    <td><span class="badge badge-steel">@item.ItemType</span></td>
+                    <td class="num">₹@item.Price.ToString("0.00")</td>
+                    <td>
+                        <span class="badge @(item.IsAvailable ? "badge-curry" : "badge-tamarind")">@(item.IsAvailable ? "Yes" : "No")</span>
+                    </td>
+                    <td>
+                        <a asp-action="EditItem" asp-route-itemId="@item.ItemID" class="btn-ghost">Edit</a>
+                        <form asp-action="ToggleAvailability" method="post" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="itemId" value="@item.ItemID" />
+                            <button type="submit" class="btn-ghost" style="border:none; background:none; cursor:pointer;">
+                                @(item.IsAvailable ? "Mark Unavailable" : "Mark Available")
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
