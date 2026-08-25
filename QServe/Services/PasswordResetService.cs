@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using QServe.Data;
 using QServe.Models;
 
@@ -15,30 +16,29 @@ public class PasswordResetService : IPasswordResetService
     private readonly IEmailTemplateService _templateService;
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
+    private readonly ILogger<PasswordResetService> _logger;
 
     public PasswordResetService(
         ApplicationDbContext db, 
         IEmailSender emailSender, 
         IEmailTemplateService templateService,
         IConfiguration config, 
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        ILogger<PasswordResetService> logger)
     {
         _db = db;
         _emailSender = emailSender;
         _templateService = templateService;
         _config = config;
         _env = env;
+        _logger = logger;
     }
 
     public async Task<string?> RequestResetAsync(string email)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email && u.IsActive);
 
-        // Enumeration safety: the RETURN VALUE never differs based on whether the account
-        // exists in Production (always null there), and the caller shows one generic message
-        // regardless. We do skip the token/email work entirely for a non-match, which is a
-        // minor timing signal — accepted trade-off for a staff-only internal tool, not a
-        // public consumer product where that timing difference would matter more.
+        // Enumeration safety: the RETURN VALUE never differs based on whether the account exists
         if (user is null)
             return null;
 
@@ -48,21 +48,37 @@ public class PasswordResetService : IPasswordResetService
 
         user.PasswordResetTokenHash = tokenHash;
         user.PasswordResetTokenExpiry = DateTime.UtcNow.Add(TokenLifetime);
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            EntityType = "Users",
+            EntityID = user.UserID,
+            Action = "PasswordResetRequested",
+            PerformedBy = null,
+            Timestamp = DateTime.UtcNow
+        });
+
         await _db.SaveChangesAsync();
 
         var baseUrl = _config["App:BaseUrl"]?.TrimEnd('/')
             ?? throw new InvalidOperationException("App:BaseUrl is not configured.");
         var resetLink = $"{baseUrl}/Account/ResetPassword?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(rawToken)}";
 
-        // Render HTML template
-        var htmlBody = await _templateService.RenderPasswordResetTemplateAsync(
-            user.FullName ?? "User",
-            resetLink);
+        try
+        {
+            var htmlBody = await _templateService.RenderPasswordResetTemplateAsync(
+                user.FullName ?? "Staff Member",
+                resetLink);
 
-        await _emailSender.SendAsync(new EmailMessage(
-            ToEmail: email,
-            Subject: "Reset your QServe password",
-            Body: htmlBody));
+            await _emailSender.SendAsync(new EmailMessage(
+                ToEmail: email,
+                Subject: "Reset your QServe password",
+                Body: htmlBody));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send password reset email to {Email}", email);
+        }
 
         return _env.IsDevelopment() ? resetLink : null;
     }
@@ -80,7 +96,7 @@ public class PasswordResetService : IPasswordResetService
             return false;
 
         if (user.PasswordResetTokenExpiry.Value < DateTime.UtcNow)
-            return false; // expired — caller should prompt for a fresh request, not retry this token
+            return false; // expired
 
         var suppliedHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
         var tokenValid = CryptographicOperations.FixedTimeEquals(
@@ -91,10 +107,8 @@ public class PasswordResetService : IPasswordResetService
             return false;
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
-        // Single-use: clear the token immediately so this same link can't be replayed.
         user.PasswordResetTokenHash = null;
         user.PasswordResetTokenExpiry = null;
-        // A fresh password shouldn't stay locked out behind old failed login attempts.
         user.AccessFailedCount = 0;
         user.LockoutEnd = null;
 
@@ -103,7 +117,7 @@ public class PasswordResetService : IPasswordResetService
             EntityType = "Users",
             EntityID = user.UserID,
             Action = "PasswordResetSelfService",
-            PerformedBy = null, // no admin involved — the user reset their own password
+            PerformedBy = null,
             Timestamp = DateTime.UtcNow
         });
 

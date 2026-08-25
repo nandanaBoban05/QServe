@@ -13,9 +13,7 @@ namespace QServe.Services;
 /// Module 5: Payment Processing.
 ///
 /// Talks to Razorpay via plain REST calls (Orders API) rather than the official SDK — this
-/// keeps the dependency footprint small and the behaviour easy to verify line-by-line. Swap in
-/// the official Razorpay .NET SDK later if you'd rather not maintain the HTTP calls by hand;
-/// the interface (IPaymentService) is the seam, nothing else in the app needs to change.
+/// keeps the dependency footprint small and the behaviour easy to verify line-by-line.
 ///
 /// No order in this system ever reaches OrderStatus=Approved except through this service.
 /// Customer Ordering (Module 4) only ever creates PendingPayment / AwaitingVerification orders.
@@ -104,9 +102,6 @@ public class PaymentService : IPaymentService
 
         // PAY-2: Razorpay's standard checkout signature is
         //   HMAC-SHA256(key_secret, razorpay_order_id + "|" + razorpay_payment_id)
-        // Recompute it server-side — never trust the client's "payment succeeded" callback alone.
-        // NOTE: this is a DIFFERENT signature scheme from the webhook below — don't reuse this
-        // logic there, and don't reuse the webhook's HMAC-over-raw-body logic here.
         var keySecret = _config["Razorpay:KeySecret"]!;
         var payload = $"{razorpayOrderId}|{razorpayPaymentId}";
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(keySecret));
@@ -122,7 +117,6 @@ public class PaymentService : IPaymentService
             await WriteAuditLogAsync("Payments", order.Payment.PaymentID, "PaymentSignatureInvalid",
                 oldValue: null, newValue: JsonSerializer.Serialize(new { razorpayOrderId, razorpayPaymentId }),
                 performedBy: null);
-            // AC: a forged/invalid signature is rejected and changes NO order status.
             return ConfirmResult.SignatureInvalid;
         }
 
@@ -135,9 +129,6 @@ public class PaymentService : IPaymentService
         var webhookSecret = _config["Razorpay:WebhookSecret"]
             ?? throw new InvalidOperationException("Razorpay:WebhookSecret not configured.");
 
-        // A TRUE webhook: HMAC-SHA256 over the exact raw request body, using a secret that is
-        // configured separately in Razorpay's dashboard (Settings -> Webhooks) — this is NOT
-        // the same secret math as the checkout.js signature in ConfirmOnlinePaymentAsync above.
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(webhookSecret));
         var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(rawRequestBody));
         var computedSignature = Convert.ToHexString(computedHash).ToLowerInvariant();
@@ -156,10 +147,6 @@ public class PaymentService : IPaymentService
         using var doc = JsonDocument.Parse(rawRequestBody);
         var eventType = doc.RootElement.TryGetProperty("event", out var eventProp) ? eventProp.GetString() : null;
 
-        // Only "payment.captured" moves anything — every other event type (order.paid,
-        // payment.authorized, etc.) is acknowledged with a 200 but otherwise ignored. Razorpay
-        // retries webhooks that don't return 2xx, so returning true here for events we don't
-        // act on prevents pointless retries, not just missed ones.
         if (eventType != "payment.captured")
             return true;
 
@@ -168,17 +155,29 @@ public class PaymentService : IPaymentService
         var razorpayPaymentId = paymentEntity.GetProperty("id").GetString();
 
         if (razorpayOrderId is null || razorpayPaymentId is null)
-            return true; // malformed payload despite a valid signature — nothing sane to act on
+            return true;
 
         var payment = await _db.Payments
             .Include(p => p.Order).ThenInclude(o => o!.Table)
             .FirstOrDefaultAsync(p => p.RazorpayOrderID == razorpayOrderId);
 
-        // Idempotent against ConfirmOnlinePaymentAsync (or a duplicate webhook delivery —
-        // Razorpay explicitly does not guarantee exactly-once delivery) already having approved
-        // this same payment.
         if (payment?.Order is null || payment.PaymentStatus == PaymentStatuses.Received)
             return true;
+
+        // Server-side Amount Verification: Ensure captured amount matches the authoritative QServe order amount
+        var capturedAmountInPaise = paymentEntity.TryGetProperty("amount", out var amtProp) && amtProp.TryGetInt64(out var amt)
+            ? (long?)amt
+            : null;
+        var expectedAmountInPaise = (long)(payment.Amount * 100);
+
+        if (capturedAmountInPaise.HasValue && capturedAmountInPaise.Value != expectedAmountInPaise)
+        {
+            await WriteAuditLogAsync("Payments", payment.PaymentID, "PaymentAmountMismatch",
+                JsonSerializer.Serialize(new { expected = expectedAmountInPaise }),
+                JsonSerializer.Serialize(new { received = capturedAmountInPaise }),
+                performedBy: null);
+            return true; // Reject approval on amount mismatch
+        }
 
         await ApproveOnlinePaymentAsync(payment.Order, razorpayPaymentId, "OnlinePaymentApprovedViaWebhook", payment);
         return true;
@@ -190,7 +189,9 @@ public class PaymentService : IPaymentService
             .FirstOrDefaultAsync(o => o.OrderID == orderId);
         if (order?.Payment is null) return;
 
-        // PAY-9: gateway failure cancels the order.
+        if (!OrderStatusStateMachine.CanTransition(order.OrderStatus, OrderStatuses.Cancelled))
+            return;
+
         order.Payment.PaymentStatus = PaymentStatuses.Failed;
         order.OrderStatus = OrderStatuses.Cancelled;
 
@@ -210,15 +211,18 @@ public class PaymentService : IPaymentService
         if (payment.Order is null)
             throw new InvalidOperationException($"Payment {paymentId} has no associated order.");
 
-        // Idempotency guard — a double-click shouldn't re-process an already-decided payment.
+        // Idempotency guard
         if (payment.PaymentStatus != PaymentStatuses.Pending)
             return;
+
+        var targetStatus = approve ? OrderStatuses.Approved : OrderStatuses.Cancelled;
+        if (!OrderStatusStateMachine.CanTransition(payment.Order.OrderStatus, targetStatus))
+            throw new InvalidOperationException($"Cannot transition Order #{payment.Order.OrderID} from '{payment.Order.OrderStatus}' to '{targetStatus}'.");
 
         var oldStatus = payment.Order.OrderStatus;
 
         if (approve)
         {
-            // PAY-7
             payment.PaymentStatus = PaymentStatuses.Received;
             payment.VerifiedBy = adminUserId;
             payment.VerificationTime = DateTime.UtcNow;
@@ -227,12 +231,6 @@ public class PaymentService : IPaymentService
         }
         else
         {
-            // PAY-8. Also stamp VerifiedBy/VerificationTime here, not just on approval — the
-            // Module 10 Payment Verification Log report needs a complete record of every
-            // admin decision, not only the approved half of them. PaymentStatuses has no
-            // dedicated "Rejected" value (fixed to the four states in the Module 1 schema),
-            // so a rejection is recorded as Failed — semantically accurate (the payment was
-            // not accepted) and distinguishable from Received in the report via PaymentStatus.
             payment.PaymentStatus = PaymentStatuses.Failed;
             payment.VerifiedBy = adminUserId;
             payment.VerificationTime = DateTime.UtcNow;
@@ -247,12 +245,9 @@ public class PaymentService : IPaymentService
 
         await _db.SaveChangesAsync();
 
-        // AI-1/AI-6: classify only on approval — a rejected/cancelled order never reaches
-        // the kitchen queue, so classifying it would be wasted work.
         if (approve)
         {
             await _orderClassifier.ClassifyAndSaveAsync(payment.Order.OrderID);
-            // REC-1: same reasoning — only a genuinely approved order counts toward popularity.
             await _recommendationService.OnOrderApprovedAsync(payment.Order.OrderID);
         }
 
@@ -279,12 +274,16 @@ public class PaymentService : IPaymentService
                 new StringContent("{}", Encoding.UTF8, "application/json"));
             response.EnsureSuccessStatusCode();
         }
-        // Cash/Card refunds happen physically at the till — nothing to call out to; this just
-        // records the state change and gives the transaction an audit trail either way.
 
         var oldStatus = payment.PaymentStatus;
         payment.PaymentStatus = PaymentStatuses.Refunded;
-        payment.Order.OrderStatus = OrderStatuses.Cancelled;
+        if (payment.Order != null)
+        {
+            if (OrderStatusStateMachine.CanTransition(payment.Order.OrderStatus, OrderStatuses.Cancelled))
+            {
+                payment.Order.OrderStatus = OrderStatuses.Cancelled;
+            }
+        }
 
         await WriteAuditLogAsync("Payments", payment.PaymentID, "PaymentRefunded",
             JsonSerializer.Serialize(new { PaymentStatus = oldStatus }),
@@ -293,26 +292,25 @@ public class PaymentService : IPaymentService
 
         await _db.SaveChangesAsync();
 
-        await _realtime.BroadcastOrderStatusUpdateAsync(new OrderStatusUpdateDto(
-            payment.Order.OrderID, payment.Order.Table?.TableNumber ?? "", payment.Order.OrderStatus, DateTime.UtcNow));
+        if (payment.Order != null)
+        {
+            await _realtime.BroadcastOrderStatusUpdateAsync(new OrderStatusUpdateDto(
+                payment.Order.OrderID, payment.Order.Table?.TableNumber ?? "", payment.Order.OrderStatus, DateTime.UtcNow));
+        }
     }
 
-    /// <summary>
-    /// The single place an Online order actually becomes Approved — shared by
-    /// ConfirmOnlinePaymentAsync (checkout.js callback) and HandleWebhookAsync (server-to-
-    /// server webhook), so classification/popularity/broadcast side-effects never drift
-    /// between the two confirmation paths.
-    /// </summary>
     private async Task ApproveOnlinePaymentAsync(Order order, string razorpayPaymentId, string auditAction, Payment? payment = null)
     {
         payment ??= order.Payment ?? throw new InvalidOperationException($"Order {order.OrderID} has no Payment record.");
+
+        if (!OrderStatusStateMachine.CanTransition(order.OrderStatus, OrderStatuses.Approved))
+            return;
 
         var isInMemory = _db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
         var transaction = isInMemory ? null : await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
         try
         {
-            // Re-read status within the transaction to prevent concurrent webhook/confirm race conditions
             var currentStatus = await _db.Payments.Where(p => p.PaymentID == payment.PaymentID).Select(p => p.PaymentStatus).FirstOrDefaultAsync();
             if (currentStatus == PaymentStatuses.Received) return;
 
@@ -333,12 +331,9 @@ public class PaymentService : IPaymentService
             if (transaction != null) await transaction.DisposeAsync();
         }
 
-        // AI-1/AI-6
         await _orderClassifier.ClassifyAndSaveAsync(order.OrderID);
-        // REC-1
         await _recommendationService.OnOrderApprovedAsync(order.OrderID);
 
-        // Module 7
         await _realtime.BroadcastOrderStatusUpdateAsync(new OrderStatusUpdateDto(
             order.OrderID, order.Table?.TableNumber ?? "", order.OrderStatus, order.ApprovedAt ?? DateTime.UtcNow));
     }
@@ -356,6 +351,6 @@ public class PaymentService : IPaymentService
             PerformedBy = performedBy,
             Timestamp = DateTime.UtcNow
         });
-        await Task.CompletedTask; // kept async-shaped in case this becomes a separate audit store later
+        await Task.CompletedTask;
     }
 }

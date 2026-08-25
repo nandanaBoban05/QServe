@@ -9,6 +9,10 @@ public class AdminDashboardStats
 {
     public int TodayOrderCount { get; set; }
     public decimal TodayRevenue { get; set; }
+    public int TodayCompletedOrderCount { get; set; }
+    public int TodayCancelledOrderCount { get; set; }
+    public decimal TodayOnlineRevenue { get; set; }
+    public decimal TodayOfflineRevenue { get; set; }
     public int PendingVerificationCount { get; set; }
 
     // Added for the improved dashboard pass: operational counts that give a real system feel

@@ -1,46 +1,96 @@
 @model List<QServe.Models.Order>
 @{
-    ViewData["Title"] = "Kitchen Display";
+    ViewData["Title"] = "Kitchen Display System";
+    string currentFilter = ViewBag.CurrentStatusFilter ?? "Active";
 }
 
 <nav class="topbar">
     <span class="topbar__brand" style="display:flex; align-items:center; gap:8px;">
         <img src="~/images/logo.png" alt="QServe" class="brand-logo" width="24" height="24" />
-        QServe — Kitchen
+        QServe — Kitchen Display
     </span>
+    <div style="display:flex; gap:6px; margin-left:16px;">
+        <a href="@Url.Action("Index", new { status = "Active" })"
+           class="topbar__link @(currentFilter is "Active" or "" ? "active" : "")">
+            All Active (@ViewBag.ActiveCount)
+        </a>
+        <a href="@Url.Action("Index", new { status = "Approved" })"
+           class="topbar__link @(currentFilter == "Approved" ? "active" : "")">
+            New (@ViewBag.ApprovedCount)
+        </a>
+        <a href="@Url.Action("Index", new { status = "Preparing" })"
+           class="topbar__link @(currentFilter == "Preparing" ? "active" : "")">
+            Preparing (@ViewBag.PreparingCount)
+        </a>
+        <a href="@Url.Action("Index", new { status = "Ready" })"
+           class="topbar__link @(currentFilter == "Ready" ? "active" : "")">
+            Ready (@ViewBag.ReadyCount)
+        </a>
+        <a href="@Url.Action("Index", new { status = "Served" })"
+           class="topbar__link @(currentFilter == "Served" ? "active" : "")">
+            Served Today (@ViewBag.ServedTodayCount)
+        </a>
+    </div>
     <span class="topbar__spacer"></span>
+    @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+    {
+        <a asp-controller="Admin" asp-action="Index" class="topbar__link" style="margin-right:12px;">Admin Dashboard →</a>
+    }
     <form asp-controller="Account" asp-action="Logout" method="post" style="display:inline;">
         @Html.AntiForgeryToken()
         <button type="submit" class="topbar__logout">Log out</button>
     </form>
 </nav>
 
-<div class="page">
+<div class="page" style="max-width:1200px;">
     <div class="page-head">
         <div>
-            <span class="eyebrow">Live Queue</span>
-            <h1>Kitchen</h1>
+            <span class="eyebrow">Live Kitchen Queue</span>
+            <h1>Kitchen Display</h1>
         </div>
-        <div style="display:flex; gap:8px;">
-            <span class="badge tier-quick" style="padding:4px 10px;">Quick</span>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <span class="badge tier-quick" style="padding:4px 10px;">Quick (&le;10m)</span>
             <span class="badge tier-regular" style="padding:4px 10px;">Regular</span>
-            <span class="badge tier-heavy" style="padding:4px 10px;">Heavy</span>
+            <span class="badge tier-heavy" style="padding:4px 10px;">Heavy (&gt;25m)</span>
         </div>
     </div>
+
+    @if (TempData["KdsError"] is string errorMsg)
+    {
+        <div class="validation-summary-errors" style="margin-bottom:16px;">
+            <p>@errorMsg</p>
+        </div>
+    }
 
     <div class="kds-grid">
     @foreach (var order in Model)
     {
+        var elapsedMinutes = (int)(DateTime.UtcNow - order.CreatedAt).TotalMinutes;
+        var ageText = elapsedMinutes < 1 ? "Just now" : $"{elapsedMinutes}m ago";
+
         <div class="kds-card tier-@order.OrderType.ToLower()" data-order-id="@order.OrderID">
             <div class="kds-card__head">
-                <span>@order.OrderType</span>
-                <span>Table @order.Table?.TableNumber</span>
+                <div style="display:flex; flex-direction:column;">
+                    <span style="font-weight:800; font-size:16px;">Table @(order.Table?.TableNumber ?? "-")</span>
+                    <span class="mono text-muted" style="font-size:11px;">#@order.OrderID.ToString("D5") &middot; @ageText</span>
+                </div>
+                <span class="badge @(order.OrderType == "Quick" ? "badge-curry" : order.OrderType == "Heavy" ? "badge-tamarind" : "badge-turmeric")">
+                    @order.OrderType
+                </span>
             </div>
+
+            @if (!string.IsNullOrWhiteSpace(order.Notes))
+            {
+                <div style="background:var(--turmeric-tint); border-radius:4px; padding:4px 8px; font-size:12px; margin-bottom:8px; color:var(--ink);">
+                    <strong>Note:</strong> @order.Notes
+                </div>
+            }
+
             <ul>
                 @foreach (var line in order.OrderItems)
                 {
                     <li>
-                        @line.Quantity &times; @line.Item?.Name
+                        <strong>@line.Quantity &times;</strong> @(line.Item?.Name ?? "Item #" + line.ItemID)
                         @if (!string.IsNullOrWhiteSpace(line.Customization))
                         {
                             <div class="custom-note">@line.Customization</div>
@@ -48,29 +98,48 @@
                     </li>
                 }
             </ul>
+
             <div class="kds-card__foot">
-                <span class="mono" style="font-size:11px; opacity:0.85;">@order.OrderStatus</span>
-                @if (order.OrderStatus == "Approved")
-                {
-                    <form asp-action="MarkPreparing" asp-route-orderId="@order.OrderID" method="post">
-                        @Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-primary btn-sm">Start Preparing</button>
-                    </form>
-                }
-                else if (order.OrderStatus == "Preparing")
-                {
-                    <form asp-action="MarkReady" asp-route-orderId="@order.OrderID" method="post">
-                        @Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-primary btn-sm">Mark Ready</button>
-                    </form>
-                }
-                else if (order.OrderStatus == "Ready")
-                {
-                    <form asp-action="MarkServed" asp-route-orderId="@order.OrderID" method="post">
-                        @Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-primary btn-sm">Mark Served</button>
-                    </form>
-                }
+                <div>
+                    @{
+                        string statusBadge = order.OrderStatus switch {
+                            "Approved" => "badge-steel",
+                            "Preparing" => "badge-turmeric",
+                            "Ready" => "badge-curry",
+                            "Served" => "badge-steel",
+                            _ => "badge-steel"
+                        };
+                    }
+                    <span class="badge @statusBadge" style="font-size:10px;">@order.OrderStatus</span>
+                </div>
+
+                <div>
+                    @if (order.OrderStatus == "Approved")
+                    {
+                        <form asp-action="MarkPreparing" asp-route-orderId="@order.OrderID" method="post" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-primary btn-sm">Start Preparing</button>
+                        </form>
+                    }
+                    else if (order.OrderStatus == "Preparing")
+                    {
+                        <form asp-action="MarkReady" asp-route-orderId="@order.OrderID" method="post" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-primary btn-sm">Mark Ready</button>
+                        </form>
+                    }
+                    else if (order.OrderStatus == "Ready")
+                    {
+                        <form asp-action="MarkServed" asp-route-orderId="@order.OrderID" method="post" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline btn-sm">Mark Served</button>
+                        </form>
+                    }
+                    else if (order.OrderStatus == "Served")
+                    {
+                        <span class="mono text-muted" style="font-size:11px;">Completed</span>
+                    }
+                </div>
             </div>
         </div>
     }
@@ -78,17 +147,26 @@
 
     @if (!Model.Any())
     {
-        <p class="kds-empty">No active orders right now.</p>
+        <div class="card mt-lg" style="text-align:center; padding:40px 20px;">
+            <p class="kds-empty" style="margin:0;">No orders in this queue right now.</p>
+        </div>
     }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
 <script>
+    let reloadTimer = null;
+    function scheduleReload() {
+        if (reloadTimer) clearTimeout(reloadTimer);
+        reloadTimer = setTimeout(() => window.location.reload(), 1000);
+    }
+
     const connection = new signalR.HubConnectionBuilder()
         .withUrl("/hubs/kitchen")
-        .withAutomaticReconnect()
+        .withAutomaticReconnect([0, 2000, 5000, 10000])
         .build();
 
-    connection.on("OrderStatusUpdate", () => window.location.reload());
+    connection.on("OrderStatusUpdate", () => scheduleReload());
+    connection.on("PaymentPendingVerification", () => scheduleReload());
     connection.start().catch(err => console.error("SignalR connection failed:", err));
 </script>

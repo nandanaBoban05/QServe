@@ -6,9 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
-  <ItemGroup>
-    <Content Include="..\..\..\..\Downloads\logo.png" Link="wwwroot\images\logo.png" />
-  </ItemGroup>
+
 
   <ItemGroup>
     <!-- Core EF Core -->

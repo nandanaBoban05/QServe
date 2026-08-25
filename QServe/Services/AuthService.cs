@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using QServe.Data;
+using QServe.Models;
 
 namespace QServe.Services;
 
@@ -34,10 +35,22 @@ public class AuthService : IAuthService
         if (!passwordMatches)
         {
             user.AccessFailedCount++;
+            var lockedNow = false;
             if (user.AccessFailedCount >= MaxFailedAttempts)
             {
                 user.LockoutEnd = DateTime.UtcNow.Add(LockoutDuration);
+                lockedNow = true;
             }
+
+            _db.AuditLogs.Add(new AuditLog
+            {
+                EntityType = "Users",
+                EntityID = user.UserID,
+                Action = lockedNow ? "AccountLocked" : "LoginFailed",
+                PerformedBy = null,
+                Timestamp = DateTime.UtcNow
+            });
+
             await _db.SaveChangesAsync();
 
             return user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow
@@ -48,6 +61,16 @@ public class AuthService : IAuthService
         // Success — reset failed-attempt counter
         user.AccessFailedCount = 0;
         user.LockoutEnd = null;
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            EntityType = "Users",
+            EntityID = user.UserID,
+            Action = "LoginSuccess",
+            PerformedBy = user.UserID,
+            Timestamp = DateTime.UtcNow
+        });
+
         await _db.SaveChangesAsync();
 
         return new LoginOutcome(LoginResult.Success, user.UserID, user.Role, user.FullName);

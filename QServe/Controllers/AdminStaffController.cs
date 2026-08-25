@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QServe.Data;
 using QServe.Models;
+using QServe.ViewModels;
 
 namespace QServe.Controllers;
 
@@ -25,10 +26,46 @@ public class AdminStaffController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index([FromQuery] AdminStaffFilterViewModel filter)
     {
-        var users = await _db.Users.OrderBy(u => u.FullName).ToListAsync();
-        return View(users);
+        var query = _db.Users.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var search = filter.Search.Trim();
+            query = query.Where(u => u.FullName.Contains(search) || u.Email.Contains(search));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Role) && filter.Role != "All")
+        {
+            query = query.Where(u => u.Role == filter.Role);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Status) && filter.Status != "All")
+        {
+            if (filter.Status == "Active") query = query.Where(u => u.IsActive);
+            else if (filter.Status == "Deactivated") query = query.Where(u => !u.IsActive);
+        }
+
+        var totalCount = await query.CountAsync();
+        var pageSize = filter.PageSize > 0 ? filter.PageSize : 20;
+        var page = filter.Page > 0 ? filter.Page : 1;
+
+        var users = await query
+            .OrderBy(u => u.FullName)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        filter.Users = new PagedResult<User>
+        {
+            Items = users,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+
+        return View(filter);
     }
 
     [HttpGet]
@@ -38,30 +75,40 @@ public class AdminStaffController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(string fullName, string email, string password, string role)
     {
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            ModelState.AddModelError(string.Empty, "Full name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+        {
+            ModelState.AddModelError(string.Empty, "A valid email address is required.");
+        }
+
         if (role is not (UserRoles.Admin or UserRoles.Kitchen or UserRoles.Manager))
         {
             ModelState.AddModelError(string.Empty, "Invalid role.");
-            return View();
         }
 
         if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
         {
             ModelState.AddModelError(string.Empty, "Password must be at least 8 characters.");
-            return View();
         }
 
         if (await _db.Users.AnyAsync(u => u.Email == email))
         {
-            // AUTH-2-style caution applies here too, though less critically since this is an
-            // authenticated Admin-only action, not a public-facing one.
             ModelState.AddModelError(string.Empty, "A user with that email already exists.");
+        }
+
+        if (!ModelState.IsValid)
+        {
             return View();
         }
 
         var user = new User
         {
-            FullName = fullName,
-            Email = email,
+            FullName = fullName.Trim(),
+            Email = email.Trim().ToLowerInvariant(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
             Role = role,
             IsActive = true,
@@ -73,12 +120,10 @@ public class AdminStaffController : Controller
         await WriteAuditLogAsync("Users", user.UserID, "StaffAccountCreated", null,
             JsonSerializer.Serialize(new { user.FullName, user.Email, user.Role }));
 
+        TempData["StaffMessage"] = $"Staff account created for {user.FullName} ({user.Role}).";
         return RedirectToAction(nameof(Index));
     }
 
-    // Gap fix: previously an admin could only change a name/email/role by deactivating and
-    // recreating the account, which loses the UserID history behind existing AuditLogs and
-    // Payments.VerifiedBy references. This edits the same row in place.
     [HttpGet]
     public async Task<IActionResult> Edit(int userId)
     {
@@ -94,33 +139,45 @@ public class AdminStaffController : Controller
         var user = await _db.Users.FindAsync(userId);
         if (user is null) return NotFound();
 
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            ModelState.AddModelError(string.Empty, "Full name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+        {
+            ModelState.AddModelError(string.Empty, "A valid email address is required.");
+        }
+
         if (role is not (UserRoles.Admin or UserRoles.Kitchen or UserRoles.Manager))
         {
             ModelState.AddModelError(string.Empty, "Invalid role.");
-            return View(user);
         }
 
         if (await _db.Users.AnyAsync(u => u.Email == email && u.UserID != userId))
         {
             ModelState.AddModelError(string.Empty, "A different user already has that email.");
+        }
+
+        if (!ModelState.IsValid)
+        {
             return View(user);
         }
 
         var oldValue = JsonSerializer.Serialize(new { user.FullName, user.Email, user.Role });
 
-        user.FullName = fullName;
-        user.Email = email;
+        user.FullName = fullName.Trim();
+        user.Email = email.Trim().ToLowerInvariant();
         user.Role = role;
         await _db.SaveChangesAsync();
 
         await WriteAuditLogAsync("Users", user.UserID, "StaffAccountEdited", oldValue,
             JsonSerializer.Serialize(new { user.FullName, user.Email, user.Role }));
 
+        TempData["StaffMessage"] = $"Staff account updated for {user.FullName}.";
         return RedirectToAction(nameof(Index));
     }
 
-    // AUTH-7: deactivating here is what actually blocks login — AuthService already checks
-    // IsActive on every attempt, so this action needs no extra enforcement of its own.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ToggleActive(int userId)
@@ -152,13 +209,10 @@ public class AdminStaffController : Controller
         await WriteAuditLogAsync("Users", user.UserID,
             wasActive ? "StaffAccountDeactivated" : "StaffAccountReactivated", null, null);
 
+        TempData["StaffMessage"] = $"Account for {user.FullName} is now {(user.IsActive ? "Active" : "Deactivated")}.";
         return RedirectToAction(nameof(Index));
     }
 
-    // Gap fix: previously a locked-out account (5 failed logins -> 15 min lockout, see
-    // AuthService) had no recovery path except waiting. An Admin can now clear it immediately —
-    // useful when the lockout is confirmed to be the legitimate user mistyping their password,
-    // not an attack in progress.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ClearLockout(int userId)
@@ -172,13 +226,10 @@ public class AdminStaffController : Controller
 
         await WriteAuditLogAsync("Users", user.UserID, "LockoutCleared", null, null);
 
+        TempData["StaffMessage"] = $"Lockout cleared for {user.FullName}.";
         return RedirectToAction(nameof(Index));
     }
 
-    // Gap fix: previously there was no password reset at all — a staff member who forgot their
-    // password had no way back in. This is admin-assisted (the admin sets a temporary password
-    // and communicates it out-of-band) rather than self-service email reset, which was
-    // explicitly out of scope for v1 per the Module 2 PRD.
     [HttpGet]
     public async Task<IActionResult> ResetPassword(int userId)
     {
@@ -206,14 +257,13 @@ public class AdminStaffController : Controller
         }
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
-        // A fresh password shouldn't stay locked out behind old failed attempts.
         user.AccessFailedCount = 0;
         user.LockoutEnd = null;
         await _db.SaveChangesAsync();
 
         await WriteAuditLogAsync("Users", user.UserID, "PasswordResetByAdmin", null, null);
 
-        TempData["StaffMessage"] = $"Password reset for {user.FullName}. Share the new password with them directly — it isn't emailed.";
+        TempData["StaffMessage"] = $"Password reset for {user.FullName}. Share the new password with them directly.";
         return RedirectToAction(nameof(Index));
     }
 

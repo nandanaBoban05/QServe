@@ -1,4 +1,4 @@
-@model List<QServe.Models.MenuCategory>
+@model QServe.ViewModels.AdminCategoryFilterViewModel
 @{
     ViewData["Title"] = "Menu Categories";
 }
@@ -6,49 +6,100 @@
 <partial name="_AdminNav" />
 
 <div class="page page--narrow">
-    <span class="eyebrow">Menu</span>
+    <span class="eyebrow">Menu Organization</span>
     <h1>Categories</h1>
 
-    <div class="card mt-lg">
+    @if (TempData["CategoryError"] is string error)
+    {
+        <div class="validation-summary-errors" style="margin-bottom:16px;"><p>@error</p></div>
+    }
+    @if (TempData["CategorySuccess"] is string success)
+    {
+        <div class="card" style="background:var(--curry-tint); border-color:#b9caae; padding:10px 16px; margin-bottom:16px;">
+            <span style="font-size:13.5px;">@success</span>
+        </div>
+    }
+
+    <!-- Search & Filter Bar -->
+    <div class="card" style="margin-bottom:20px; padding:16px 20px;">
+        <form method="get" asp-action="Categories" class="field-row">
+            <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;">
+                <label>Search Category</label>
+                <input type="text" name="Search" value="@Model.Search" placeholder="Category name..." />
+            </div>
+            <div class="form-group" style="margin-bottom:0; width:150px;">
+                <label>Status</label>
+                <select name="Status">
+                    <option value="All" selected="@(Model.Status == "All" || string.IsNullOrEmpty(Model.Status) ? "selected" : null)">All</option>
+                    <option value="Active" selected="@(Model.Status == "Active" ? "selected" : null)">Active</option>
+                    <option value="Hidden" selected="@(Model.Status == "Hidden" ? "selected" : null)">Hidden</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" style="height:40px; padding:0 16px;">Filter</button>
+            <a asp-action="Categories" class="btn btn-outline btn-sm" style="height:40px; padding:0 12px; display:inline-flex; align-items:center;">Reset</a>
+        </form>
+    </div>
+
+    <div class="card">
         <table class="data-table">
             <thead>
-                <tr><th>Name</th><th>Order</th><th>Status</th><th>Action</th></tr>
+                <tr>
+                    <th>Name</th>
+                    <th>Items</th>
+                    <th>Display Order</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Action</th>
+                </tr>
             </thead>
             <tbody>
-            @foreach (var category in Model)
+            @if (!Model.Categories.Any())
             {
-                <tr class="@(category.IsActive ? "" : "is-dim")">
-                    <td>@category.Name</td>
-                    <td class="num">@category.DisplayOrder</td>
-                    <td><span class="badge @(category.IsActive ? "badge-curry" : "badge-steel")">@(category.IsActive ? "Active" : "Hidden")</span></td>
-                    <td>
-                        <form asp-action="ToggleCategoryActive" method="post" style="display:inline;">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="categoryId" value="@category.CategoryID" />
-                            <button type="submit" class="btn-ghost" style="border:none; background:none; cursor:pointer;">
-                                @(category.IsActive ? "Hide" : "Show")
-                            </button>
-                        </form>
-                    </td>
+                <tr>
+                    <td colspan="5" class="kds-empty">No categories match the criteria.</td>
                 </tr>
+            }
+            else
+            {
+                @foreach (var category in Model.Categories)
+                {
+                    <tr class="@(category.IsActive ? "" : "is-dim")">
+                        <td style="font-weight:600;">@category.Name</td>
+                        <td class="num">@(category.Items?.Count ?? 0)</td>
+                        <td class="num">@category.DisplayOrder</td>
+                        <td>
+                            <span class="badge @(category.IsActive ? "badge-curry" : "badge-steel")">
+                                @(category.IsActive ? "Active" : "Hidden")
+                            </span>
+                        </td>
+                        <td style="text-align:right;">
+                            <form asp-action="ToggleCategoryActive" method="post" style="display:inline;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="categoryId" value="@category.CategoryID" />
+                                <button type="submit" class="btn btn-outline btn-sm">
+                                    @(category.IsActive ? "Hide" : "Show")
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
             }
             </tbody>
         </table>
     </div>
 
     <div class="card mt-lg">
-        <h3 style="margin-bottom:14px;">Add a category</h3>
+        <h3 style="margin-bottom:14px;">Add New Category</h3>
         <form asp-action="CreateCategory" method="post" class="field-row">
             @Html.AntiForgeryToken()
             <div class="form-group" style="margin-bottom:0; flex:1;">
                 <label>Name</label>
-                <input type="text" name="name" required />
+                <input type="text" name="name" placeholder="e.g. Starters, Biryani, Desserts" required />
             </div>
             <div class="form-group" style="margin-bottom:0;">
                 <label>Display order</label>
-                <input type="number" name="displayOrder" value="0" style="width:90px;" />
+                <input type="number" name="displayOrder" value="0" min="0" style="width:90px;" />
             </div>
-            <button type="submit" class="btn btn-primary">Add Category</button>
+            <button type="submit" class="btn btn-primary" style="height:40px;">Add Category</button>
         </form>
     </div>
 </div>

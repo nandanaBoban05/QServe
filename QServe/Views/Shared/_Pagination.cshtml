@@ -1,0 +1,69 @@
+@{
+    int currentPage = 1;
+    int totalPages = 1;
+    int totalCount = 0;
+
+    if (Model != null)
+    {
+        var type = Model.GetType();
+        var pageProp = type.GetProperty("Page");
+        var totalPagesProp = type.GetProperty("TotalPages");
+        var totalCountProp = type.GetProperty("TotalCount");
+
+        if (pageProp != null) currentPage = (int)pageProp.GetValue(Model)!;
+        if (totalPagesProp != null) totalPages = (int)totalPagesProp.GetValue(Model)!;
+        if (totalCountProp != null) totalCount = (int)totalCountProp.GetValue(Model)!;
+    }
+    else if (ViewBag.Page != null)
+    {
+        currentPage = (int)ViewBag.Page;
+        totalPages = ViewBag.TotalPages != null ? (int)ViewBag.TotalPages : 1;
+        totalCount = ViewBag.TotalCount != null ? (int)ViewBag.TotalCount : 0;
+    }
+
+    bool hasPrev = currentPage > 1;
+    bool hasNext = currentPage < totalPages;
+
+    string BuildPageUrl(int targetPage)
+    {
+        var query = new Dictionary<string, string?>();
+        foreach (var key in Context.Request.Query.Keys)
+        {
+            if (string.Equals(key, "page", StringComparison.OrdinalIgnoreCase)) continue;
+            query[key] = Context.Request.Query[key];
+        }
+        query["page"] = targetPage.ToString();
+        var queryString = string.Join("&", query
+            .Where(kv => !string.IsNullOrEmpty(kv.Value))
+            .Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value!)}"));
+        return $"{Context.Request.Path}?{queryString}";
+    }
+}
+
+@if (totalPages > 1 || totalCount > 0)
+{
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:16px; padding-top:12px; border-top:1px dashed var(--steel-line);">
+        <div class="text-muted mono" style="font-size:12px;">
+            Page @currentPage of @(Math.Max(1, totalPages)) <span style="opacity:0.7;">(@totalCount records)</span>
+        </div>
+        <div style="display:flex; gap:6px;">
+            @if (hasPrev)
+            {
+                <a class="btn btn-outline btn-sm" href="@BuildPageUrl(currentPage - 1)">← Previous</a>
+            }
+            else
+            {
+                <span class="btn btn-outline btn-sm" style="opacity:0.35; pointer-events:none;">← Previous</span>
+            }
+
+            @if (hasNext)
+            {
+                <a class="btn btn-outline btn-sm" href="@BuildPageUrl(currentPage + 1)">Next →</a>
+            }
+            else
+            {
+                <span class="btn btn-outline btn-sm" style="opacity:0.35; pointer-events:none;">Next →</span>
+            }
+        </div>
+    </div>
+}

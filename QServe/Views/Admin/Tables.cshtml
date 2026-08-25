@@ -1,73 +1,148 @@
-@model List<QServe.Models.RestaurantTable>
+@model QServe.ViewModels.AdminTableFilterViewModel
 @{
     ViewData["Title"] = "Tables & QR Codes";
 }
 
 <partial name="_AdminNav" />
 
-<div class="page page--narrow">
-    <span class="eyebrow">Floor</span>
-    <h1>Tables &amp; QR Codes</h1>
+<div class="page">
+    <div class="page-head">
+        <div>
+            <span class="eyebrow">Floor Management</span>
+            <h1>Tables &amp; QR Codes</h1>
+        </div>
+        <div class="mono text-muted" style="font-size:13px;">
+            Total: <strong>@Model.Tables.TotalCount</strong> tables
+        </div>
+    </div>
 
     @if (TempData["TableError"] is string errorMessage)
     {
-        <div class="validation-summary-errors mt-lg" style="margin-bottom:0;"><p>@errorMessage</p></div>
+        <div class="validation-summary-errors" style="margin-bottom:16px;"><p>@errorMessage</p></div>
     }
     @if (TempData["TableSuccess"] is string successMessage)
     {
-        <div class="card mt-lg" style="background:var(--curry-tint); border-color:#b9caae; padding:10px 16px;">
+        <div class="card" style="background:var(--curry-tint); border-color:#b9caae; padding:10px 16px; margin-bottom:16px;">
             <span style="font-size:13.5px;">@successMessage</span>
         </div>
     }
 
-    <div class="card mt-lg">
-        <table class="data-table">
-            <thead>
-                <tr><th>Table</th><th>Capacity</th><th>Status</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-            @foreach (var table in Model)
-            {
-                <tr class="@(table.IsActive ? "" : "is-dim")">
-                    <td class="num">@table.TableNumber</td>
-                    <td class="num">@table.Capacity</td>
-                    <td>
-                        <span class="badge @(table.IsActive ? "badge-curry" : "badge-steel")">@(table.IsActive ? "Active" : "Inactive")</span>
-                    </td>
-                    <td>
-                        <a href="@Url.Action("TableQr", new { tableId = table.TableID })" target="_blank" class="btn-ghost">QR</a>
-                        <form asp-action="RegenerateQr" method="post" style="display:inline;">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="tableId" value="@table.TableID" />
-                            <button type="submit" class="btn-ghost" style="border:none; background:none; cursor:pointer;">Regenerate</button>
-                        </form>
-                        <form asp-action="ToggleTableActive" method="post" style="display:inline;">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="tableId" value="@table.TableID" />
-                            <button type="submit" class="btn-ghost" style="border:none; background:none; cursor:pointer;">
-                                @(table.IsActive ? "Deactivate" : "Activate")
-                            </button>
-                        </form>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
-
-    <div class="card mt-lg">
-        <h3 style="margin-bottom:14px;">Add a table</h3>
-        <form asp-action="CreateTable" method="post" class="field-row">
-            @Html.AntiForgeryToken()
-            <div class="form-group" style="margin-bottom:0;">
-                <label>Table number</label>
-                <input type="text" name="tableNumber" required style="width:140px;" />
+    <!-- Search & Filter Bar -->
+    <div class="card" style="margin-bottom:20px; padding:16px 20px;">
+        <form method="get" asp-action="Tables" class="field-row">
+            <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;">
+                <label>Search Table</label>
+                <input type="text" name="Search" value="@Model.Search" placeholder="Table number..." />
             </div>
-            <div class="form-group" style="margin-bottom:0;">
-                <label>Capacity</label>
-                <input type="number" name="capacity" value="4" min="1" style="width:80px;" />
+            <div class="form-group" style="margin-bottom:0; width:160px;">
+                <label>Status</label>
+                <select name="Status">
+                    <option value="All" selected="@(Model.Status == "All" || string.IsNullOrEmpty(Model.Status) ? "selected" : null)">All Tables</option>
+                    <option value="Active" selected="@(Model.Status == "Active" ? "selected" : null)">Active Only</option>
+                    <option value="Inactive" selected="@(Model.Status == "Inactive" ? "selected" : null)">Inactive Only</option>
+                </select>
             </div>
-            <button type="submit" class="btn btn-primary">Add Table</button>
+            <button type="submit" class="btn btn-primary btn-sm" style="height:40px; padding:0 16px;">Filter</button>
+            <a asp-action="Tables" class="btn btn-outline btn-sm" style="height:40px; padding:0 12px; display:inline-flex; align-items:center;">Reset</a>
         </form>
     </div>
+
+    <div class="dash-grid">
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Table</th>
+                        <th>Capacity</th>
+                        <th>Status</th>
+                        <th style="text-align:right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (!Model.Tables.Items.Any())
+                {
+                    <tr>
+                        <td colspan="4" class="kds-empty">No tables match the query.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var table in Model.Tables.Items)
+                    {
+                        var qrUrl = Model.TableQrUrls.TryGetValue(table.TableID, out var url) ? url : "";
+                        <tr class="@(table.IsActive ? "" : "is-dim")">
+                            <td class="num" style="font-weight:700;">Table @table.TableNumber</td>
+                            <td class="num">@table.Capacity seats</td>
+                            <td>
+                                <span class="badge @(table.IsActive ? "badge-curry" : "badge-steel")">
+                                    @(table.IsActive ? "Active" : "Inactive")
+                                </span>
+                            </td>
+                            <td style="text-align:right; white-space:nowrap;">
+                                <a href="@Url.Action("TableQr", new { tableId = table.TableID })" target="_blank" class="btn btn-outline btn-sm" style="padding:3px 8px; font-size:11.5px;">
+                                    View QR
+                                </a>
+                                @if (!string.IsNullOrEmpty(qrUrl))
+                                {
+                                    <button type="button" class="btn btn-outline btn-sm" style="padding:3px 8px; font-size:11.5px;"
+                                            onclick="copyQrLink('@qrUrl', this)">
+                                        Copy Link
+                                    </button>
+                                }
+                                <form asp-action="RegenerateQr" method="post" style="display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="tableId" value="@table.TableID" />
+                                    <button type="submit" class="btn btn-outline btn-sm" style="padding:3px 8px; font-size:11.5px;" title="Regenerate QR token">
+                                        Refresh
+                                    </button>
+                                </form>
+                                <form asp-action="ToggleTableActive" method="post" style="display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="tableId" value="@table.TableID" />
+                                    <button type="submit" class="btn btn-ghost btn-sm" style="padding:3px 6px;">
+                                        @(table.IsActive ? "Deactivate" : "Activate")
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+
+            <partial name="_Pagination" model="Model.Tables" />
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom:14px;">Add New Table</h3>
+            <form asp-action="CreateTable" method="post">
+                @Html.AntiForgeryToken()
+                <div class="form-group">
+                    <label>Table Number / Code</label>
+                    <input type="text" name="tableNumber" placeholder="e.g. 10, T-04, Balcony-1" required />
+                </div>
+                <div class="form-group">
+                    <label>Seating Capacity</label>
+                    <input type="number" name="capacity" value="4" min="1" max="50" required />
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Add Restaurant Table</button>
+            </form>
+        </div>
+    </div>
 </div>
+
+<script>
+    function copyQrLink(url, btn) {
+        navigator.clipboard.writeText(url).then(() => {
+            const originalText = btn.textContent;
+            btn.textContent = "Copied!";
+            btn.style.color = "var(--curry)";
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.color = "";
+            }, 2000);
+        }).catch(err => {
+            prompt("Copy this customer QR link:", url);
+        });
+    }
+</script>

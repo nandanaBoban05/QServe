@@ -1,19 +1,25 @@
 @model QServe.Models.Order
 @{
-    ViewData["Title"] = "Order Status";
+    ViewData["Title"] = "Order #" + Model.OrderID.ToString("D5");
 }
 
 <div class="ticket-shell" style="text-align:center;">
     <div class="ticket-brand">
-        <img src="~/images/logo.png" alt="" width="18" height="18" class="brand-logo brand-logo--plain" />
+        <img src="~/images/logo.png" alt="QServe" width="20" height="20" class="brand-logo brand-logo--plain" />
         <span>QServe</span>
     </div>
-    <span class="eyebrow">Order No.</span>
-    <h1 class="mono" style="font-size:26px;">#@Model.OrderID.ToString("D6")</h1>
-    <p class="text-muted mono" style="font-size:13px; margin-top:-6px;">Table @Model.Table?.TableNumber</p>
+    <span class="eyebrow">Order Confirmation &amp; Live Tracking</span>
+    <h1 class="mono" style="font-size:26px; margin:4px 0;">#@Model.OrderID.ToString("D5")</h1>
+    <p class="text-muted mono" style="font-size:13px; margin-top:-2px; margin-bottom:16px;">
+        Table @(Model.Table?.TableNumber ?? Model.TableID.ToString()) &middot; @Model.CreatedAt.ToString("MMM d, HH:mm")
+    </p>
 
-    <div class="punch-tracker">
-        @foreach (var step in new[] { "Approved", "Preparing", "Ready", "Served" })
+    <!-- Visual Milestone Tracker -->
+    <div class="punch-tracker" style="margin:20px 0;">
+        @{
+            var steps = new[] { "Approved", "Preparing", "Ready", "Served" };
+        }
+        @foreach (var step in steps)
         {
             <div class="punch-step @(IsAtOrPast(Model.OrderStatus, step) ? "done" : "")" data-step="@step">
                 <div class="punch-dot"></div>
@@ -22,25 +28,87 @@
         }
     </div>
 
-    <p style="font-size:14px;">Current status: <strong id="status-text">@Model.OrderStatus</strong></p>
+    <!-- Live Status Banner -->
+    <div class="card" style="padding:16px; margin-bottom:20px; background:var(--surface);">
+        <span class="eyebrow" style="font-size:10px;">Current Status</span>
+        <div style="font-size:18px; font-weight:700; margin-top:2px;" id="status-text">
+            @Model.OrderStatus
+        </div>
 
-    @if (Model.OrderStatus is "PendingPayment" or "AwaitingVerification")
+        @if (Model.OrderStatus is "PendingPayment" or "AwaitingVerification")
+        {
+            <p class="text-muted" style="font-size:13px; margin:8px 0 0;">
+                Waiting on payment confirmation — this screen updates automatically once approved.
+            </p>
+        }
+        else if (Model.OrderStatus == "Approved")
+        {
+            <p class="text-muted" style="font-size:13px; margin:8px 0 0; color:var(--curry);">
+                Order approved! The kitchen has received your ticket.
+            </p>
+        }
+        else if (Model.OrderStatus == "Preparing")
+        {
+            <p class="text-muted" style="font-size:13px; margin:8px 0 0; color:var(--turmeric-deep);">
+                Your food is actively being prepared in the kitchen.
+            </p>
+        }
+        else if (Model.OrderStatus == "Ready")
+        {
+            <p class="text-muted" style="font-size:13px; margin:8px 0 0; color:var(--curry); font-weight:600;">
+                Your order is ready! A staff member is bringing it to your table.
+            </p>
+        }
+        else if (Model.OrderStatus == "Served")
+        {
+            <p class="text-muted" style="font-size:13px; margin:8px 0 0; color:var(--ink-soft);">
+                Enjoy your meal! Thank you for dining with QServe.
+            </p>
+        }
+        else if (Model.OrderStatus == "Cancelled")
+        {
+            <p style="color:var(--tamarind); font-size:13px; margin:8px 0 0;">
+                This order was cancelled. Please speak to a staff member.
+            </p>
+        }
+    </div>
+
+    <!-- Order Items Summary Chit -->
+    @if (Model.OrderItems.Any())
     {
-        <p class="text-muted" style="font-size:13px;">Waiting on payment confirmation — this page updates automatically once it's approved.</p>
-    }
-    @if (Model.OrderStatus == "Cancelled")
-    {
-        <p style="color:var(--tamarind); font-size:13px;">This order was cancelled. Please speak to a staff member.</p>
+        <div class="card" style="text-align:left; padding:14px 16px; margin-bottom:20px;">
+            <span class="eyebrow" style="font-size:10px; display:block; margin-bottom:8px;">Order Summary</span>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                @foreach (var item in Model.OrderItems)
+                {
+                    <div style="display:flex; justify-content:space-between; font-size:13px;">
+                        <div>
+                            <span><strong>@item.Quantity &times;</strong> @(item.Item?.Name ?? "Item #" + item.ItemID)</span>
+                            @if (!string.IsNullOrWhiteSpace(item.Customization))
+                            {
+                                <div class="text-muted" style="font-size:11px;">@item.Customization</div>
+                            }
+                        </div>
+                        <span class="mono">₹@((item.Quantity * item.UnitPrice).ToString("0.00"))</span>
+                    </div>
+                }
+            </div>
+
+            <div style="border-top:1px dashed var(--border); margin-top:10px; padding-top:8px; display:flex; justify-content:space-between; font-size:14px; font-weight:700;">
+                <span>Total Paid / Payable</span>
+                <span class="mono" style="color:var(--turmeric-deep);">₹@Model.TotalAmount.ToString("0.00")</span>
+            </div>
+        </div>
     }
 
-    <div class="mt-lg" style="display:flex; flex-direction:column; gap:8px;">
-        <a href="@Url.Action("Menu", new { tableId = Model.TableID })" class="btn btn-primary btn-block" style="padding:13px;">
-            + Order More
+    <div style="display:flex; flex-direction:column; gap:8px;">
+        <a href="@Url.Action("Menu", new { tableId = Model.TableID })" class="btn btn-primary btn-block" style="padding:14px;">
+            + Order More Items
         </a>
-        @if ((int)ViewBag.SessionOrderCount > 1)
+        @if ((int)(ViewBag.SessionOrderCount ?? 0) > 1)
         {
             <a href="@Url.Action("TableOrders", new { tableId = Model.TableID })" class="btn btn-outline btn-block">
-                View All Your Orders
+                View All Table Orders
             </a>
         }
     </div>
@@ -48,36 +116,39 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
 <script>
-    // Module 7: genuine live push via KitchenHub, replacing the earlier polling fallback.
-    // The filter on data.orderId matters — this hub broadcasts every order's updates to
-    // every connected client (see RealtimeNotifier), so each Status page ignores updates
-    // for orders that aren't its own.
-    const orderId = @Model.OrderID;
+    const currentOrderId = @Model.OrderID;
     const stepOrder = ["Approved", "Preparing", "Ready", "Served"];
 
-    function applyStatus(status) {
-        document.getElementById("status-text").textContent = status;
+    function applyStatus(newStatus) {
+        if (!newStatus) return;
+        const statusEl = document.getElementById("status-text");
+        if (statusEl) statusEl.textContent = newStatus;
+
         document.querySelectorAll(".punch-step").forEach(el => {
             const idx = stepOrder.indexOf(el.dataset.step);
-            const currentIdx = stepOrder.indexOf(status);
+            const currentIdx = stepOrder.indexOf(newStatus);
             el.classList.toggle("done", currentIdx >= 0 && idx <= currentIdx);
         });
     }
 
     const connection = new signalR.HubConnectionBuilder()
         .withUrl("/hubs/kitchen")
-        .withAutomaticReconnect()
+        .withAutomaticReconnect([0, 2000, 5000, 10000])
         .build();
 
     connection.on("OrderStatusUpdate", (data) => {
-        if (data.orderID === orderId) applyStatus(data.newStatus);
+        const orderId = data.orderID || data.orderId || data.OrderID;
+        const status = data.newStatus || data.NewStatus;
+        if (orderId === currentOrderId) {
+            applyStatus(status);
+        }
     });
 
     connection.start().catch(err => {
-        console.error("SignalR connection failed, falling back to a one-off refresh:", err);
-        fetch(`/order/status/${orderId}/json`)
+        console.error("SignalR connection failed, falling back to one-time sync:", err);
+        fetch(`/order/status/${currentOrderId}/json`)
             .then(res => res.ok ? res.json() : null)
-            .then(data => { if (data) applyStatus(data.status); });
+            .then(data => { if (data && data.status) applyStatus(data.status); });
     });
 </script>
 

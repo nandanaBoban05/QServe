@@ -3,24 +3,33 @@
     ViewData["Title"] = "Your Cart";
     int tableId = ViewBag.TableId;
     var total = Model.Sum(c => c.LineTotal);
+    int totalItems = Model.Sum(c => c.Quantity);
 }
 
 <div class="ticket-shell">
     <div class="ticket-brand">
-        <img src="~/images/logo.png" alt="" width="18" height="18" class="brand-logo brand-logo--plain" />
+        <img src="~/images/logo.png" alt="QServe" width="20" height="20" class="brand-logo brand-logo--plain" />
         <span>QServe</span>
     </div>
     <div class="ticket-topline">
         <span class="table-stamp">TABLE @ViewBag.TableNumber</span>
-        <a class="cart-tab" href="@Url.Action("Menu", new { tableId, token = Context.Session.GetString($"token:table:{tableId}") })">Back to Menu</a>
+        <a class="cart-tab" href="@Url.Action("Menu", new { tableId, token = Context.Session.GetString($"token:table:{tableId}") })">&larr; Back to Menu</a>
     </div>
 
-    <h1 style="font-size:22px; margin-bottom:16px;">Your Order</h1>
+    <h1 style="font-size:22px; margin-bottom:12px;">Your Cart</h1>
+
+    @if (TempData["CartError"] is string cartError)
+    {
+        <div class="validation-summary-errors" style="margin-bottom:16px;">
+            <p>@cartError</p>
+        </div>
+    }
 
     @if (!Model.Any())
     {
-        <div class="ticket-card">
-            <p class="text-muted" style="margin:0;">Your cart is empty.</p>
+        <div class="card" style="text-align:center; padding:32px 16px;">
+            <p class="text-muted" style="margin:0 0 16px; font-size:15px;">Your cart is empty.</p>
+            <a href="@Url.Action("Menu", new { tableId })" class="btn btn-primary btn-sm">Browse Menu</a>
         </div>
     }
     else
@@ -29,58 +38,76 @@
             @for (int i = 0; i < Model.Count; i++)
             {
                 var line = Model[i];
-                <div class="receipt-line">
-                    <div>
-                        <div class="ticket-card__name">@line.Name</div>
+                <div class="receipt-line" style="display:flex; justify-content:space-between; align-items:flex-start; padding:10px 0; border-bottom:1px dashed var(--border);">
+                    <div style="flex:1; padding-right:12px;">
+                        <div class="ticket-card__name" style="font-weight:600;">@line.Name</div>
                         @if (!string.IsNullOrWhiteSpace(line.Customization))
                         {
-                            <div class="text-muted" style="font-size:12px;">@line.Customization</div>
+                            <div class="text-muted" style="font-size:12px; margin-top:2px;">Note: @line.Customization</div>
                         }
-                        <div class="mono text-muted" style="font-size:12px;">₹@line.UnitPrice.ToString("0.00") each</div>
+                        <div class="mono text-muted" style="font-size:12px; margin-top:2px;">₹@line.UnitPrice.ToString("0.00") each</div>
                     </div>
-                    <form asp-action="UpdateCart" asp-route-tableId="@tableId" method="post" style="display:flex; gap:4px;">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="itemId" value="@line.ItemID" />
-                        <input type="hidden" name="customization" value="@line.Customization" />
-                        <input type="number" name="quantity" value="@line.Quantity" min="0" max="50"
-                               class="qty-input cart-qty" data-price="@line.UnitPrice.ToString(System.Globalization.CultureInfo.InvariantCulture)"
-                               data-line-index="@i" />
-                        <button type="submit" class="btn btn-outline btn-sm">Update</button>
-                    </form>
-                    <div class="mono line-total" id="line-total-@i" style="font-weight:600;">₹@line.LineTotal.ToString("0.00")</div>
+
+                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                        <form asp-action="UpdateCart" asp-route-tableId="@tableId" method="post" style="display:flex; gap:4px; align-items:center;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="itemId" value="@line.ItemID" />
+                            <input type="hidden" name="customization" value="@line.Customization" />
+                            <input type="number" name="quantity" value="@line.Quantity" min="0" max="50"
+                                   class="qty-input cart-qty" data-price="@line.UnitPrice.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                   data-line-index="@i" aria-label="Quantity for @line.Name" />
+                            <button type="submit" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px;">Update</button>
+                        </form>
+                        <div class="mono line-total" id="line-total-@i" style="font-weight:700; font-size:14px;">₹@line.LineTotal.ToString("0.00")</div>
+                    </div>
                 </div>
             }
 
-            <div class="receipt-total">
-                <span>Total</span>
-                <span id="cart-grand-total">₹@total.ToString("0.00")</span>
+            <div class="receipt-total" style="display:flex; justify-content:space-between; padding-top:14px; font-size:16px; font-weight:700;">
+                <span>Total (<span id="cart-item-count">@totalItems</span> items)</span>
+                <span id="cart-grand-total" class="mono" style="color:var(--turmeric-deep);">₹@total.ToString("0.00")</span>
             </div>
         </div>
 
-        <form asp-action="Checkout" asp-route-tableId="@tableId" method="post" class="mt-lg">
+        <form id="checkout-form" asp-action="Checkout" asp-route-tableId="@tableId" method="post" class="mt-lg">
             @Html.AntiForgeryToken()
-            <h3 style="margin-bottom:10px;">Select payment method</h3>
+            <h3 style="margin-bottom:12px; font-size:16px;">Select Payment Method</h3>
 
-            <label class="payment-choice">
-                <input type="radio" name="paymentMode" value="Online" checked /> Online (UPI / Card)
-            </label>
-            <label class="payment-choice">
-                <input type="radio" name="paymentMode" value="Cash" /> Cash
-            </label>
-            <label class="payment-choice">
-                <input type="radio" name="paymentMode" value="Card" /> Physical POS Card
-            </label>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <label class="payment-choice" style="display:flex; align-items:center; gap:10px; padding:12px 14px; border:1px solid var(--border); border-radius:6px; cursor:pointer; background:var(--surface);">
+                    <input type="radio" name="paymentMode" value="Online" checked />
+                    <div>
+                        <strong style="display:block; font-size:14px;">Online Payment (UPI, Cards, NetBanking)</strong>
+                        <span class="text-muted" style="font-size:12px;">Instant confirmation via Razorpay</span>
+                    </div>
+                </label>
 
-            <button type="submit" class="btn btn-primary btn-block mt-lg" style="padding:14px;">Place Order</button>
+                <label class="payment-choice" style="display:flex; align-items:center; gap:10px; padding:12px 14px; border:1px solid var(--border); border-radius:6px; cursor:pointer; background:var(--surface);">
+                    <input type="radio" name="paymentMode" value="Cash" />
+                    <div>
+                        <strong style="display:block; font-size:14px;">Cash at Table</strong>
+                        <span class="text-muted" style="font-size:12px;">Staff will collect cash at your table</span>
+                    </div>
+                </label>
+
+                <label class="payment-choice" style="display:flex; align-items:center; gap:10px; padding:12px 14px; border:1px solid var(--border); border-radius:6px; cursor:pointer; background:var(--surface);">
+                    <input type="radio" name="paymentMode" value="Card" />
+                    <div>
+                        <strong style="display:block; font-size:14px;">Physical POS Card Machine</strong>
+                        <span class="text-muted" style="font-size:12px;">Staff will bring the card swiper to you</span>
+                    </div>
+                </label>
+            </div>
+
+            <button type="submit" id="place-order-btn" class="btn btn-primary btn-block mt-lg" style="padding:15px; font-size:16px; font-weight:700;">
+                Place Order &middot; ₹@total.ToString("0.00")
+            </button>
         </form>
     }
 </div>
 
 <script>
-    // Gap fix (CUST-5): the total previously only updated after a full server round-trip via
-    // the "Update" button. This recalculates instantly as the customer types a new quantity —
-    // purely a display refresh; the actual persisted change still happens on "Update" submit,
-    // this just removes the lag between typing and seeing the new total.
+    // Real-time calculation on typing quantity
     document.querySelectorAll(".cart-qty").forEach(input => {
         input.addEventListener("input", () => {
             const price = parseFloat(input.dataset.price);
@@ -89,13 +116,31 @@
             if (lineTotalEl) lineTotalEl.textContent = `₹${(price * qty).toFixed(2)}`;
 
             let grandTotal = 0;
+            let totalCount = 0;
             document.querySelectorAll(".cart-qty").forEach(el => {
                 const p = parseFloat(el.dataset.price);
                 const q = Math.max(0, parseInt(el.value, 10) || 0);
                 grandTotal += p * q;
+                totalCount += q;
             });
             const grandTotalEl = document.getElementById("cart-grand-total");
             if (grandTotalEl) grandTotalEl.textContent = `₹${grandTotal.toFixed(2)}`;
+            const itemCountEl = document.getElementById("cart-item-count");
+            if (itemCountEl) itemCountEl.textContent = totalCount;
+            const btn = document.getElementById("place-order-btn");
+            if (btn) btn.textContent = `Place Order · ₹${grandTotal.toFixed(2)}`;
         });
     });
+
+    // Double-submit prevention
+    const checkoutForm = document.getElementById("checkout-form");
+    if (checkoutForm) {
+        checkoutForm.addEventListener("submit", function () {
+            const submitBtn = document.getElementById("place-order-btn");
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Placing order...";
+            }
+        });
+    }
 </script>

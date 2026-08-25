@@ -1,0 +1,235 @@
+@model QServe.ViewModels.AdminOrderDetailsViewModel
+@{
+    var order = Model.Order;
+    ViewData["Title"] = $"Order #{order.OrderID:D5} Details";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page">
+    <div class="page-head">
+        <div>
+            <a asp-action="Orders" class="btn-ghost" style="text-decoration:none; margin-bottom:4px; display:inline-block;">← Back to Orders</a>
+            <span class="eyebrow" style="display:block;">Ticket Chit</span>
+            <h1>Order #@order.OrderID.ToString("D5")</h1>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+            @{
+                string badgeClass = order.OrderStatus switch {
+                    "Approved" => "badge-curry",
+                    "Preparing" => "badge-turmeric",
+                    "Ready" => "badge-curry",
+                    "Served" => "badge-steel",
+                    "Cancelled" => "badge-tamarind",
+                    _ => "badge-steel"
+                };
+            }
+            <span class="badge @badgeClass" style="font-size:12px; padding:4px 12px;">@order.OrderStatus</span>
+            <span class="badge @(order.OrderType == "Quick" ? "badge-curry" : order.OrderType == "Heavy" ? "badge-tamarind" : "badge-turmeric")" style="font-size:12px; padding:4px 12px;">
+                @order.OrderType Tier
+            </span>
+        </div>
+    </div>
+
+    <!-- Order Overview Cards -->
+    <div class="stat-grid mt-lg">
+        <div class="stat-card">
+            <div class="stat-value">Table @(order.Table?.TableNumber ?? "-")</div>
+            <div class="stat-label">Capacity: @(order.Table?.Capacity ?? 0) guests</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">₹@order.TotalAmount.ToString("0.00")</div>
+            <div class="stat-label">Total Amount</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="font-size:20px;">@order.CreatedAt.ToString("MMM d, yyyy")</div>
+            <div class="stat-label">Placed at @order.CreatedAt.ToString("HH:mm:ss") UTC</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="font-size:20px;">@(order.Payment?.PaymentMode ?? "None")</div>
+            <div class="stat-label">Payment: @(order.Payment?.PaymentStatus ?? "None")</div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(order.Notes))
+    {
+        <div class="card mt-lg" style="background:var(--turmeric-tint); border-color:#ded0a4; padding:12px 18px;">
+            <strong style="font-size:13px; color:var(--ink);">Customer / Kitchen Notes:</strong>
+            <p style="margin:4px 0 0; font-size:14px;">@order.Notes</p>
+        </div>
+    }
+
+    <!-- Order Items Chit -->
+    <div class="card mt-lg">
+        <h3 style="margin-bottom:14px;">Order Items Breakdown</h3>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Category</th>
+                    <th>Type</th>
+                    <th style="text-align:right;">Unit Price</th>
+                    <th style="text-align:center;">Qty</th>
+                    <th style="text-align:right;">Line Total</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in order.OrderItems)
+            {
+                <tr>
+                    <td>
+                        <strong>@(item.Item?.Name ?? "Item #" + item.ItemID)</strong>
+                        @if (!string.IsNullOrWhiteSpace(item.Customization))
+                        {
+                            <div style="font-size:12px; color:var(--tamarind); margin-top:2px;">
+                                <em>Customization: @item.Customization</em>
+                            </div>
+                        }
+                    </td>
+                    <td>@(item.Item?.Category?.Name ?? "-")</td>
+                    <td><span class="badge badge-steel">@(item.Item?.ItemType ?? "-")</span></td>
+                    <td class="num" style="text-align:right;">₹@item.UnitPrice.ToString("0.00")</td>
+                    <td class="num" style="text-align:center; font-weight:700;">@item.Quantity</td>
+                    <td class="num" style="text-align:right; font-weight:700;">₹@item.LineTotal.ToString("0.00")</td>
+                </tr>
+            }
+            </tbody>
+            <tfoot>
+                <tr style="border-top:2px solid var(--ink);">
+                    <td colspan="4" style="font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Subtotal</td>
+                    <td class="num" style="text-align:center; font-weight:700;">@order.OrderItems.Sum(i => i.Quantity)</td>
+                    <td class="num" style="text-align:right; font-weight:700;">₹@order.TotalAmount.ToString("0.00")</td>
+                </tr>
+                <tr>
+                    <td colspan="5" style="font-size:13px; color:var(--ink-soft); border-bottom:none;">Taxes &amp; GST</td>
+                    <td class="num" style="text-align:right; font-size:13px; color:var(--ink-soft); border-bottom:none;">Included</td>
+                </tr>
+                <tr style="border-top:1px dashed var(--steel-line);">
+                    <td colspan="5" style="font-size:16px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Grand Total</td>
+                    <td class="num" style="text-align:right; font-size:18px; font-weight:800; color:var(--ink);">₹@order.TotalAmount.ToString("0.00")</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- Payment Details & History -->
+    <div class="dash-grid mt-lg">
+        <div class="card">
+            <h3 style="margin-bottom:14px;">Payment Information</h3>
+            @if (order.Payment == null)
+            {
+                <p class="text-muted">No payment record associated with this order.</p>
+            }
+            else
+            {
+                <table class="data-table" style="font-size:13.5px;">
+                    <tr>
+                        <td style="font-weight:600; width:150px;">Payment ID</td>
+                        <td class="num">#@order.Payment.PaymentID</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:600;">Status</td>
+                        <td>
+                            <span class="badge @(order.Payment.PaymentStatus == "Received" ? "badge-curry" : order.Payment.PaymentStatus == "Refunded" || order.Payment.PaymentStatus == "Failed" ? "badge-tamarind" : "badge-turmeric")">
+                                @order.Payment.PaymentStatus
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:600;">Payment Mode</td>
+                        <td>@order.Payment.PaymentMode</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:600;">Amount</td>
+                        <td class="num" style="font-weight:700;">₹@order.Payment.Amount.ToString("0.00")</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:600;">Initiated</td>
+                        <td class="num">@order.Payment.CreatedAt.ToString("MMM d, yyyy HH:mm:ss") UTC</td>
+                    </tr>
+                    @if (order.Payment.VerificationTime.HasValue)
+                    {
+                        <tr>
+                            <td style="font-weight:600;">Verified / Resolved</td>
+                            <td class="num">@order.Payment.VerificationTime.Value.ToString("MMM d, yyyy HH:mm:ss") UTC</td>
+                        </tr>
+                    }
+                    @if (order.Payment.VerifiedByUser != null)
+                    {
+                        <tr>
+                            <td style="font-weight:600;">Verified By</td>
+                            <td>@order.Payment.VerifiedByUser.FullName (@order.Payment.VerifiedByUser.Role)</td>
+                        </tr>
+                    }
+                    @if (!string.IsNullOrEmpty(order.Payment.RazorpayOrderID))
+                    {
+                        <tr>
+                            <td style="font-weight:600;">Razorpay Order ID</td>
+                            <td class="mono" style="font-size:12px;">@order.Payment.RazorpayOrderID</td>
+                        </tr>
+                    }
+                    @if (!string.IsNullOrEmpty(order.Payment.RazorpayPaymentID))
+                    {
+                        <tr>
+                            <td style="font-weight:600;">Razorpay Payment ID</td>
+                            <td class="mono" style="font-size:12px;">@order.Payment.RazorpayPaymentID</td>
+                        </tr>
+                    }
+                </table>
+
+                @if (order.Payment.PaymentStatus == "Received")
+                {
+                    <div style="margin-top:16px;">
+                        <form asp-action="RefundPayment" method="post"
+                              onsubmit="return confirm('Are you sure you want to refund ₹@order.Payment.Amount.ToString("0.00") for this order?');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="paymentId" value="@order.Payment.PaymentID" />
+                            <button type="submit" class="btn btn-outline btn-sm" style="color:var(--tamarind); border-color:var(--tamarind);">
+                                Process Refund
+                            </button>
+                        </form>
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Status & Accountability Timeline -->
+        <div class="card">
+            <h3 style="margin-bottom:12px;">Order Lifecycle Timeline</h3>
+            @if (!Model.Timeline.Any())
+            {
+                <p class="kds-empty">No audit timeline entries recorded for this order.</p>
+            }
+            else
+            {
+                <ul class="activity-feed">
+                @foreach (var log in Model.Timeline)
+                {
+                    <li>
+                        <span class="activity-dot"></span>
+                        <div style="flex:1;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <strong style="font-size:13px;">@log.Action</strong>
+                                <span class="text-muted mono" style="font-size:11px;">@log.Timestamp.ToString("MMM d, HH:mm:ss")</span>
+                            </div>
+                            <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">
+                                By: <strong>@(log.PerformedByUser?.FullName ?? "System / Customer")</strong>
+                                @if (log.PerformedByUser != null)
+                                {
+                                    <span class="badge badge-steel" style="font-size:9px;">@log.PerformedByUser.Role</span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrEmpty(log.NewValue))
+                            {
+                                <div class="mono text-muted" style="font-size:11px; margin-top:3px; word-break:break-all; background:var(--paper); padding:4px 6px; border-radius:4px;">
+                                    @log.NewValue
+                                </div>
+                            }
+                        </div>
+                    </li>
+                }
+                </ul>
+            }
+        </div>
+    </div>
+</div>

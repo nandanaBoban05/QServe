@@ -91,7 +91,7 @@ public class PaymentTests
 
         Assert.Equal(ConfirmResult.Approved, result);
         Assert.Equal(OrderStatuses.Approved, order.OrderStatus);
-        Assert.Equal(PaymentStatuses.Received, order.Payment.PaymentStatus);
+        Assert.Equal(PaymentStatuses.Received, order.Payment!.PaymentStatus);
     }
 
     [Fact]
@@ -145,17 +145,44 @@ public class PaymentTests
     }
     
     [Fact]
-    public async Task RefundAsync_CancelsOrder_AndSetsPaymentStatusRefunded()
+    public async Task HandleWebhook_WithAmountMismatch_RejectsApproval()
     {
-        var order = await CreateOrderAsync("no_rzp", PaymentStatuses.Received);
-        order.OrderStatus = OrderStatuses.Approved;
-        order.Payment!.PaymentMode = PaymentModes.Cash;
+        var order = await CreateOrderAsync("order_mismatch"); // amount is 100 in CreateOrderAsync (10000 paise)
+
+        var payload = JsonSerializer.Serialize(new {
+            @event = "payment.captured",
+            payload = new {
+                payment = new {
+                    entity = new {
+                        order_id = "order_mismatch",
+                        id = "pay_mismatch",
+                        amount = 5000 // 50.00 INR instead of 100.00 INR!
+                    }
+                }
+            }
+        });
+
+        var sig = GenerateWebhookSignature(payload, "fake_webhook_secret");
+
+        var result = await _paymentService.HandleWebhookAsync(payload, sig);
+
+        Assert.True(result); // returns true to acknowledge webhook receipt
+        var dbOrder = await _db.Orders.Include(o => o.Payment).FirstAsync();
+        Assert.NotEqual(OrderStatuses.Approved, dbOrder.OrderStatus);
+        Assert.NotEqual(PaymentStatuses.Received, dbOrder.Payment!.PaymentStatus);
+    }
+
+    [Fact]
+    public async Task AdminVerify_Reject_CancelsOrderAndSetsPaymentFailed()
+    {
+        var order = await CreateOrderAsync("verify_reject", PaymentStatuses.Pending);
+        order.OrderStatus = OrderStatuses.AwaitingVerification;
         await _db.SaveChangesAsync();
 
-        await _paymentService.RefundAsync(order.Payment.PaymentID, adminUserId: 1);
+        await _paymentService.AdminVerifyAsync(order.Payment!.PaymentID, approve: false, adminUserId: 1);
 
         var dbOrder = await _db.Orders.Include(o => o.Payment).FirstAsync();
         Assert.Equal(OrderStatuses.Cancelled, dbOrder.OrderStatus);
-        Assert.Equal(PaymentStatuses.Refunded, dbOrder.Payment!.PaymentStatus);
+        Assert.Equal(PaymentStatuses.Failed, dbOrder.Payment!.PaymentStatus);
     }
 }

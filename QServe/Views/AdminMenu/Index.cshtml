@@ -1,4 +1,4 @@
-@model List<QServe.Models.MenuItem>
+@model QServe.ViewModels.AdminMenuFilterViewModel
 @{
     ViewData["Title"] = "Menu Items";
 }
@@ -8,41 +8,121 @@
 <div class="page">
     <div class="page-head">
         <div>
-            <span class="eyebrow">Menu</span>
-            <h1>Items</h1>
+            <span class="eyebrow">Menu Management</span>
+            <h1>Menu Items</h1>
         </div>
         <a asp-action="CreateItem" class="btn btn-primary">+ New Item</a>
     </div>
 
+    @if (TempData["MenuSuccess"] is string successMessage)
+    {
+        <div class="card" style="background:var(--curry-tint); border-color:#b9caae; padding:10px 16px; margin-bottom:16px;">
+            <span style="font-size:13.5px;">@successMessage</span>
+        </div>
+    }
+
+    <!-- Filter Form -->
+    <div class="card" style="margin-bottom:20px; padding:18px 20px;">
+        <form method="get" asp-action="Index">
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:12px; align-items:flex-end;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Search Item</label>
+                    <input type="text" name="Search" value="@Model.Search" placeholder="Name..." />
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Category</label>
+                    <select name="CategoryId">
+                        <option value="">All Categories</option>
+                        @foreach (var cat in Model.Categories)
+                        {
+                            <option value="@cat.CategoryID" selected="@(Model.CategoryId == cat.CategoryID ? "selected" : null)">
+                                @cat.Name
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Item Type</label>
+                    <select name="ItemType">
+                        <option value="All" selected="@(Model.ItemType == "All" || string.IsNullOrEmpty(Model.ItemType) ? "selected" : null)">All Types</option>
+                        <option value="Quick" selected="@(Model.ItemType == "Quick" ? "selected" : null)">Quick</option>
+                        <option value="Cooked" selected="@(Model.ItemType == "Cooked" ? "selected" : null)">Cooked</option>
+                        <option value="Beverage" selected="@(Model.ItemType == "Beverage" ? "selected" : null)">Beverage</option>
+                        <option value="Dessert" selected="@(Model.ItemType == "Dessert" ? "selected" : null)">Dessert</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Availability</label>
+                    <select name="Availability">
+                        <option value="All" selected="@(Model.Availability == "All" || string.IsNullOrEmpty(Model.Availability) ? "selected" : null)">All</option>
+                        <option value="Available" selected="@(Model.Availability == "Available" ? "selected" : null)">Available Only</option>
+                        <option value="Unavailable" selected="@(Model.Availability == "Unavailable" ? "selected" : null)">Unavailable Only</option>
+                    </select>
+                </div>
+
+                <div style="display:flex; gap:6px;">
+                    <button type="submit" class="btn btn-primary btn-sm" style="height:40px; flex:1;">Filter</button>
+                    <a asp-action="Index" class="btn btn-outline btn-sm" style="height:40px; padding:0 12px; display:inline-flex; align-items:center;">Reset</a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Items Table -->
     <div class="card">
-        <table class="data-table">
-            <thead>
-                <tr><th>Name</th><th>Category</th><th>Type</th><th>Price</th><th>Available</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-            @foreach (var item in Model)
-            {
-                <tr class="@(item.IsAvailable ? "" : "is-dim")">
-                    <td>@item.Name</td>
-                    <td>@item.Category?.Name</td>
-                    <td><span class="badge badge-steel">@item.ItemType</span></td>
-                    <td class="num">₹@item.Price.ToString("0.00")</td>
-                    <td>
-                        <span class="badge @(item.IsAvailable ? "badge-curry" : "badge-tamarind")">@(item.IsAvailable ? "Yes" : "No")</span>
-                    </td>
-                    <td>
-                        <a asp-action="EditItem" asp-route-itemId="@item.ItemID" class="btn-ghost">Edit</a>
-                        <form asp-action="ToggleAvailability" method="post" style="display:inline;">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="itemId" value="@item.ItemID" />
-                            <button type="submit" class="btn-ghost" style="border:none; background:none; cursor:pointer;">
-                                @(item.IsAvailable ? "Mark Unavailable" : "Mark Available")
-                            </button>
-                        </form>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
+    @if (!Model.Items.Items.Any())
+    {
+        <p class="kds-empty">No menu items match the selected filters.</p>
+    }
+    else
+    {
+        <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Type</th>
+                        <th>Price</th>
+                        <th>Prep Time</th>
+                        <th>Available</th>
+                        <th style="text-align:right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var item in Model.Items.Items)
+                {
+                    <tr class="@(item.IsAvailable ? "" : "is-dim")">
+                        <td style="font-weight:600;">@item.Name</td>
+                        <td>@(item.Category?.Name ?? "-")</td>
+                        <td><span class="badge badge-steel">@item.ItemType</span></td>
+                        <td class="num">₹@item.Price.ToString("0.00")</td>
+                        <td class="num">@item.PrepTimeMinutes min</td>
+                        <td>
+                            <span class="badge @(item.IsAvailable ? "badge-curry" : "badge-tamarind")">
+                                @(item.IsAvailable ? "Yes" : "No")
+                            </span>
+                        </td>
+                        <td style="text-align:right; white-space:nowrap;">
+                            <a asp-action="EditItem" asp-route-itemId="@item.ItemID" class="btn btn-outline btn-sm">Edit</a>
+                            <form asp-action="ToggleAvailability" method="post" style="display:inline;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="itemId" value="@item.ItemID" />
+                                <button type="submit" class="btn btn-ghost btn-sm">
+                                    @(item.IsAvailable ? "Set Unavailable" : "Set Available")
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <partial name="_Pagination" model="Model.Items" />
+    }
     </div>
 </div>

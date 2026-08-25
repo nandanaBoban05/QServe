@@ -1,4 +1,4 @@
-@model List<QServe.Models.User>
+@model QServe.ViewModels.AdminStaffFilterViewModel
 @{
     ViewData["Title"] = "Staff Accounts";
 }
@@ -21,48 +21,106 @@
         </div>
     }
 
+    <!-- Search & Filter Bar -->
+    <div class="card" style="margin-bottom:20px; padding:18px 20px;">
+        <form method="get" asp-action="Index">
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:12px; align-items:flex-end;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Search Staff</label>
+                    <input type="text" name="Search" value="@Model.Search" placeholder="Name or email..." />
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Role</label>
+                    <select name="Role">
+                        <option value="All" selected="@(Model.Role == "All" || string.IsNullOrEmpty(Model.Role) ? "selected" : null)">All Roles</option>
+                        <option value="Admin" selected="@(Model.Role == "Admin" ? "selected" : null)">Admin</option>
+                        <option value="Manager" selected="@(Model.Role == "Manager" ? "selected" : null)">Manager</option>
+                        <option value="Kitchen" selected="@(Model.Role == "Kitchen" ? "selected" : null)">Kitchen</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Status</label>
+                    <select name="Status">
+                        <option value="All" selected="@(Model.Status == "All" || string.IsNullOrEmpty(Model.Status) ? "selected" : null)">All</option>
+                        <option value="Active" selected="@(Model.Status == "Active" ? "selected" : null)">Active Only</option>
+                        <option value="Deactivated" selected="@(Model.Status == "Deactivated" ? "selected" : null)">Deactivated</option>
+                    </select>
+                </div>
+
+                <div style="display:flex; gap:6px;">
+                    <button type="submit" class="btn btn-primary btn-sm" style="height:40px; flex:1;">Filter</button>
+                    <a asp-action="Index" class="btn btn-outline btn-sm" style="height:40px; padding:0 12px; display:inline-flex; align-items:center;">Reset</a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Staff Table -->
     <div class="card">
-        <table class="data-table">
-            <thead>
-                <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-            @foreach (var user in Model)
-            {
-                var isLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow;
-                <tr class="@(user.IsActive ? "" : "is-dim")">
-                    <td>@user.FullName</td>
-                    <td>@user.Email</td>
-                    <td><span class="badge badge-steel">@user.Role</span></td>
-                    <td>
-                        <span class="badge @(user.IsActive ? "badge-curry" : "badge-tamarind")">@(user.IsActive ? "Active" : "Deactivated")</span>
-                        @if (isLocked)
-                        {
-                            <span class="badge badge-tamarind">Locked until @user.LockoutEnd!.Value.ToString("HH:mm")</span>
-                        }
-                    </td>
-                    <td>
-                        <a asp-action="Edit" asp-route-userId="@user.UserID" class="btn-ghost">Edit</a>
-                        <a asp-action="ResetPassword" asp-route-userId="@user.UserID" class="btn-ghost">Reset Password</a>
-                        @if (isLocked)
-                        {
-                            <form asp-action="ClearLockout" method="post" style="display:inline;">
+    @if (!Model.Users.Items.Any())
+    {
+        <p class="kds-empty">No staff members match the selected criteria.</p>
+    }
+    else
+    {
+        <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th style="text-align:right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var user in Model.Users.Items)
+                {
+                    var isLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow;
+                    <tr class="@(user.IsActive ? "" : "is-dim")">
+                        <td style="font-weight:600;">@user.FullName</td>
+                        <td>@user.Email</td>
+                        <td><span class="badge badge-steel">@user.Role</span></td>
+                        <td>
+                            <span class="badge @(user.IsActive ? "badge-curry" : "badge-tamarind")">
+                                @(user.IsActive ? "Active" : "Deactivated")
+                            </span>
+                            @if (isLocked)
+                            {
+                                <span class="badge badge-tamarind" style="margin-left:4px;">
+                                    Locked (@user.LockoutEnd!.Value.ToString("HH:mm"))
+                                </span>
+                            }
+                        </td>
+                        <td style="text-align:right; white-space:nowrap;">
+                            <a asp-action="Edit" asp-route-userId="@user.UserID" class="btn btn-outline btn-sm">Edit</a>
+                            <a asp-action="ResetPassword" asp-route-userId="@user.UserID" class="btn btn-outline btn-sm">Password</a>
+                            @if (isLocked)
+                            {
+                                <form asp-action="ClearLockout" method="post" style="display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="userId" value="@user.UserID" />
+                                    <button type="submit" class="btn btn-outline btn-sm" style="color:var(--turmeric-deep);">Clear Lockout</button>
+                                </form>
+                            }
+                            <form asp-action="ToggleActive" method="post" style="display:inline;">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="userId" value="@user.UserID" />
-                                <button type="submit" class="btn-ghost" style="border:none; background:none; cursor:pointer;">Clear Lockout</button>
+                                <button type="submit" class="btn btn-ghost btn-sm">
+                                    @(user.IsActive ? "Deactivate" : "Reactivate")
+                                </button>
                             </form>
-                        }
-                        <form asp-action="ToggleActive" method="post" style="display:inline;">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="userId" value="@user.UserID" />
-                            <button type="submit" class="btn-ghost" style="border:none; background:none; cursor:pointer;">
-                                @(user.IsActive ? "Deactivate" : "Reactivate")
-                            </button>
-                        </form>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <partial name="_Pagination" model="Model.Users" />
+    }
     </div>
 </div>

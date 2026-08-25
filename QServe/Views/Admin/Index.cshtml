@@ -9,6 +9,7 @@
     <span class="eyebrow">Overview</span>
     <h1>Dashboard</h1>
 
+    <!-- Primary Daily Metrics -->
     <div class="stat-grid mt-lg">
         <div class="stat-card">
             <div class="stat-value">@Model.TodayOrderCount</div>
@@ -16,7 +17,7 @@
         </div>
         <div class="stat-card">
             <div class="stat-value">₹@Model.TodayRevenue.ToString("0.00")</div>
-            <div class="stat-label">Revenue Today</div>
+            <div class="stat-label">Total Revenue Today</div>
         </div>
         <div class="stat-card @(Model.PendingVerificationCount > 0 ? "stat-alert" : "")">
             <div class="stat-value">@Model.PendingVerificationCount</div>
@@ -24,11 +25,28 @@
         </div>
         <div class="stat-card">
             <div class="stat-value">@Model.ActiveOrderCount</div>
-            <div class="stat-label">Active Orders Right Now</div>
+            <div class="stat-label">Active Orders In Kitchen/Floor</div>
         </div>
     </div>
 
-    <div class="stat-grid mt-lg" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+    <!-- Secondary Operational Metrics -->
+    <div class="stat-grid mt-lg" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+        <div class="stat-card stat-card--sm">
+            <div class="stat-value" style="font-size:20px; color:var(--curry);">@Model.TodayCompletedOrderCount</div>
+            <div class="stat-label">Served Today</div>
+        </div>
+        <div class="stat-card stat-card--sm">
+            <div class="stat-value" style="font-size:20px; color:var(--tamarind);">@Model.TodayCancelledOrderCount</div>
+            <div class="stat-label">Cancelled Today</div>
+        </div>
+        <div class="stat-card stat-card--sm">
+            <div class="stat-value" style="font-size:18px;">₹@Model.TodayOnlineRevenue.ToString("0.00")</div>
+            <div class="stat-label">Online (Razorpay)</div>
+        </div>
+        <div class="stat-card stat-card--sm">
+            <div class="stat-value" style="font-size:18px;">₹@Model.TodayOfflineRevenue.ToString("0.00")</div>
+            <div class="stat-label">Cash &amp; Card</div>
+        </div>
         <div class="stat-card stat-card--sm">
             <div class="stat-value" style="font-size:20px;">@Model.ActiveTableCount</div>
             <div class="stat-label">Active Tables</div>
@@ -45,12 +63,12 @@
 
     <div class="dash-grid mt-lg">
         <div class="card">
-            <h3 style="margin-bottom:14px;">Last 7 Days</h3>
+            <h3 style="margin-bottom:14px;">7-Day Sales &amp; Orders Trend</h3>
             <canvas id="trendChart" height="180"></canvas>
         </div>
 
         <div class="card">
-            <h3 style="margin-bottom:12px;">Recent Activity</h3>
+            <h3 style="margin-bottom:12px;">Recent Audit Activity</h3>
             @if (!Model.RecentActivity.Any())
             {
                 <p class="kds-empty">Nothing recorded yet.</p>
@@ -81,20 +99,24 @@
     <h3 class="mt-lg" style="margin-bottom:12px;">Quick Actions</h3>
     <div class="quick-actions">
         <a class="quick-action" asp-controller="Admin" asp-action="Orders">
-            <strong>Live Orders</strong>
-            <span>Monitor everything in progress</span>
+            <strong>Order Management</strong>
+            <span>Monitor and filter all live &amp; past orders</span>
         </a>
         <a class="quick-action" asp-controller="Admin" asp-action="PaymentQueue">
             <strong>Verify Payments</strong>
-            <span>@Model.PendingVerificationCount waiting</span>
+            <span>@Model.PendingVerificationCount pending staff check</span>
+        </a>
+        <a class="quick-action" asp-controller="Admin" asp-action="Payments">
+            <strong>Payment Management</strong>
+            <span>Search receipts &amp; refunds</span>
         </a>
         <a class="quick-action" asp-controller="AdminMenu" asp-action="CreateItem">
             <strong>+ Add Menu Item</strong>
-            <span>Expand today's menu</span>
+            <span>Expand food &amp; drinks catalog</span>
         </a>
         <a class="quick-action" asp-controller="Admin" asp-action="Tables">
             <strong>Manage Tables</strong>
-            <span>QR codes &amp; floor setup</span>
+            <span>Floor plan &amp; customer QR codes</span>
         </a>
     </div>
 </div>
