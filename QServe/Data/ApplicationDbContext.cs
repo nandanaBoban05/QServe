@@ -127,8 +127,8 @@ public class ApplicationDbContext : DbContext
 
     private static void SeedData(ModelBuilder modelBuilder)
     {
-        // NOTE: Password hash below is a placeholder. Replace with a real BCrypt hash
-        // once Module 2 (Authentication) is implemented — do not ship this as-is.
+        // BCrypt hashes for default dev accounts (Admin123!, Kitchen123!, Manager123!).
+        // Change these passwords before any shared or production deployment.
         modelBuilder.Entity<User>().HasData(new User
         {
             UserID = 1,

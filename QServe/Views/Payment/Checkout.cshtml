@@ -11,11 +11,14 @@
 
         <button id="pay-btn" class="btn btn-primary btn-block" style="padding:14px;">Pay Now</button>
         <p id="pay-status" style="color:var(--tamarind); font-size:13px; margin-top:12px;"></p>
+        @Html.AntiForgeryToken()
     </div>
 </div>
 
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
+    const antiforgeryToken = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
     document.getElementById("pay-btn").addEventListener("click", function () {
         const options = {
             key: "@Model.KeyId",
@@ -27,12 +30,16 @@
             handler: async function (response) {
                 const res = await fetch("/payment/confirm", {
                     method: "POST",
-                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    headers: { 
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "RequestVerificationToken": antiforgeryToken
+                    },
                     body: new URLSearchParams({
                         orderId: "@Model.OrderId",
                         razorpayOrderId: response.razorpay_order_id,
                         razorpayPaymentId: response.razorpay_payment_id,
-                        razorpaySignature: response.razorpay_signature
+                        razorpaySignature: response.razorpay_signature,
+                        __RequestVerificationToken: antiforgeryToken
                     })
                 });
                 const data = await res.json();
@@ -46,8 +53,14 @@
                 ondismiss: function () {
                     fetch("/payment/failed", {
                         method: "POST",
-                        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                        body: new URLSearchParams({ orderId: "@Model.OrderId" })
+                        headers: {
+                            "Content-Type": "application/x-www-form-urlencoded",
+                            "RequestVerificationToken": antiforgeryToken
+                        },
+                        body: new URLSearchParams({
+                            orderId: "@Model.OrderId",
+                            __RequestVerificationToken: antiforgeryToken
+                        })
                     });
                     document.getElementById("pay-status").textContent = "Payment cancelled.";
                 }

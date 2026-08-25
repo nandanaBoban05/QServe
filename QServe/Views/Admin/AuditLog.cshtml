@@ -1,10 +1,10 @@
 @model List<QServe.Models.AuditLog>
 @{
     ViewData["Title"] = "Audit Log";
-    int currentPage = ViewBag.CurrentPage;
-    bool hasNext = ViewBag.HasNextPage;
-    bool hasPrev = ViewBag.HasPrevPage;
-    int totalCount = ViewBag.TotalCount;
+    int currentPage = ViewBag.CurrentPage ?? 1;
+    bool hasNext = ViewBag.HasNextPage ?? false;
+    bool hasPrev = ViewBag.HasPrevPage ?? false;
+    int totalCount = ViewBag.TotalCount ?? 0;
 }
 
 <partial name="_AdminNav" />

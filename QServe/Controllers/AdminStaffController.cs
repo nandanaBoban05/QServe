@@ -128,6 +128,23 @@ public class AdminStaffController : Controller
         var user = await _db.Users.FindAsync(userId);
         if (user is null) return NotFound();
 
+        var currentAdminIdRaw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(currentAdminIdRaw, out var currentAdminId) && userId == currentAdminId && user.IsActive)
+        {
+            TempData["StaffMessage"] = "You cannot deactivate your own account while logged in.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (user.IsActive && user.Role == UserRoles.Admin)
+        {
+            var activeAdminCount = await _db.Users.CountAsync(u => u.IsActive && u.Role == UserRoles.Admin);
+            if (activeAdminCount <= 1)
+            {
+                TempData["StaffMessage"] = "Cannot deactivate the last active Admin account.";
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
         var wasActive = user.IsActive;
         user.IsActive = !user.IsActive;
         await _db.SaveChangesAsync();

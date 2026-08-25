@@ -49,12 +49,12 @@ public class KitchenController : Controller
     [HttpPost("order/{orderId:int}/preparing")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> MarkPreparing(int orderId) =>
-        await AdvanceStatus(orderId, OrderStatuses.Preparing);
+        await AdvanceStatus(orderId, OrderStatuses.Approved, OrderStatuses.Preparing);
 
     [HttpPost("order/{orderId:int}/ready")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> MarkReady(int orderId) =>
-        await AdvanceStatus(orderId, OrderStatuses.Ready);
+        await AdvanceStatus(orderId, OrderStatuses.Preparing, OrderStatuses.Ready);
 
     // Not strictly KDS scope per the PRD (kitchen only owns Approved -> Preparing -> Ready) —
     // included so the demo loop actually closes; a real deployment might put this action on a
@@ -66,6 +66,9 @@ public class KitchenController : Controller
         var order = await _db.Orders.Include(o => o.Table).FirstOrDefaultAsync(o => o.OrderID == orderId);
         if (order is null) return NotFound();
 
+        if (order.OrderStatus != OrderStatuses.Ready)
+            return BadRequest("Order must be Ready before it can be marked Served.");
+
         order.OrderStatus = OrderStatuses.Served;
         order.ServedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
@@ -76,10 +79,13 @@ public class KitchenController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    private async Task<IActionResult> AdvanceStatus(int orderId, string newStatus)
+    private async Task<IActionResult> AdvanceStatus(int orderId, string requiredStatus, string newStatus)
     {
         var order = await _db.Orders.Include(o => o.Table).FirstOrDefaultAsync(o => o.OrderID == orderId);
         if (order is null) return NotFound();
+
+        if (order.OrderStatus != requiredStatus)
+            return BadRequest($"Order must be {requiredStatus} before advancing to {newStatus}.");
 
         order.OrderStatus = newStatus;
         await _db.SaveChangesAsync();

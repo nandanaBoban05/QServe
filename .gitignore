@@ -361,3 +361,22 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Local secrets — this is the .NET equivalent of a .env file. Never commit real
+# Razorpay/QR/etc. credentials. appsettings.json (with placeholders) IS committed;
+# appsettings.Development.json (with real local/test values) is NOT.
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/appsettings.json
+.env
+.env.*
+
+# .NET build output
+bin/
+obj/
+*.user
+
+# IDE
+.vs/
+.vscode/
+.idea/

@@ -6,8 +6,10 @@ constraints, and seed data. The project was renamed from an earlier internal wor
 ("RestaurantOrdering") to QServe across every namespace, project file, and folder — see the
 rename notes near the bottom of this file if you're diffing against an older download.
 
-It has **not** been built/restored in this environment (no NuGet access here), so treat the
-first run as your verification step, not something already proven to work.
+It builds and tests cleanly on .NET 8 (`dotnet build`, `dotnet test` — 15 tests pass). The
+initial EF migration is already in `QServe/Migrations/`. Copy
+`appsettings.Development.json.example` to `appsettings.Development.json` (gitignored) for local
+secrets and connection overrides.
 
 ## Branding
 The logo at `wwwroot/images/logo.png` is the real QServe mark (not a placeholder) — it's used
@@ -53,13 +55,14 @@ writing new inline styles. If you add a new view, give it `Layout = "_Layout"` (
 ## First run
 ```bash
 dotnet restore
-dotnet ef migrations add InitialCreate --project QServe
+copy QServe\appsettings.Development.json.example QServe\appsettings.Development.json
 dotnet ef database update --project QServe
 dotnet run --project QServe
 ```
-If `dotnet restore` fails on a specific package version, bump the versions in
-`QServe/QServe.csproj` to whatever's current — 8.0.10 was current as
-of this writing but patch releases move fast.
+The migration already exists (`Migrations/20260817025447_initial.cs`) — only run
+`dotnet ef migrations add ...` if you change the entity model. Edit
+`appsettings.Development.json` for your local SQL Server instance, Razorpay test keys, and
+Gmail app password. Committed `appsettings.json` contains placeholders only.
 
 ## Running the tests (Module 6, Module 9)
 ```bash
@@ -84,8 +87,9 @@ QServe-Solution/
     Services/
       IAuthService.cs / AuthService.cs             Login validation + lockout logic (Module 2)
       IPasswordResetService.cs / PasswordResetService.cs   Self-service Forgot/Reset Password
-      IEmailSender.cs / DevEmailSender.cs           Logs emails instead of sending — swap for
-                                                      real SMTP/SendGrid before production
+      IEmailSender.cs / DevEmailSender.cs / GmailEmailSender.cs   DevEmailSender when
+                                                      EmailConfig has placeholders; Gmail SMTP
+                                                      when real credentials are configured
       IQrCodeService.cs / QrCodeService.cs          Signed per-table QR generation + validation (Module 3)
       IPaymentService.cs / PaymentService.cs        Razorpay checkout + admin verification (Module 5)
       IOrderClassifier.cs / OrderClassifier.cs      Quick/Regular/Heavy classification (Module 6)

@@ -96,6 +96,9 @@ public class PaymentService : IPaymentService
             .FirstOrDefaultAsync(o => o.OrderID == orderId);
         if (order?.Payment is null) return ConfirmResult.OrderNotFound;
 
+        if (order.Payment.RazorpayOrderID != razorpayOrderId)
+            return ConfirmResult.OrderNotFound; // Prevent cross-order confirmation attacks
+
         if (order.Payment.PaymentStatus == PaymentStatuses.Received)
             return ConfirmResult.AlreadyProcessed; // idempotent — don't re-approve on a duplicate callback
 
@@ -281,6 +284,7 @@ public class PaymentService : IPaymentService
 
         var oldStatus = payment.PaymentStatus;
         payment.PaymentStatus = PaymentStatuses.Refunded;
+        payment.Order.OrderStatus = OrderStatuses.Cancelled;
 
         await WriteAuditLogAsync("Payments", payment.PaymentID, "PaymentRefunded",
             JsonSerializer.Serialize(new { PaymentStatus = oldStatus }),
@@ -288,6 +292,9 @@ public class PaymentService : IPaymentService
             adminUserId);
 
         await _db.SaveChangesAsync();
+
+        await _realtime.BroadcastOrderStatusUpdateAsync(new OrderStatusUpdateDto(
+            payment.Order.OrderID, payment.Order.Table?.TableNumber ?? "", payment.Order.OrderStatus, DateTime.UtcNow));
     }
 
     /// <summary>
@@ -300,16 +307,31 @@ public class PaymentService : IPaymentService
     {
         payment ??= order.Payment ?? throw new InvalidOperationException($"Order {order.OrderID} has no Payment record.");
 
-        payment.PaymentStatus = PaymentStatuses.Received;
-        payment.RazorpayPaymentID = razorpayPaymentId;
-        payment.VerificationTime = DateTime.UtcNow;
-        order.OrderStatus = OrderStatuses.Approved;
-        order.ApprovedAt = DateTime.UtcNow;
+        var isInMemory = _db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
+        var transaction = isInMemory ? null : await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
-        await WriteAuditLogAsync("Orders", order.OrderID, auditAction, null,
-            JsonSerializer.Serialize(new { order.OrderStatus }), performedBy: null);
+        try
+        {
+            // Re-read status within the transaction to prevent concurrent webhook/confirm race conditions
+            var currentStatus = await _db.Payments.Where(p => p.PaymentID == payment.PaymentID).Select(p => p.PaymentStatus).FirstOrDefaultAsync();
+            if (currentStatus == PaymentStatuses.Received) return;
 
-        await _db.SaveChangesAsync();
+            payment.PaymentStatus = PaymentStatuses.Received;
+            payment.RazorpayPaymentID = razorpayPaymentId;
+            payment.VerificationTime = DateTime.UtcNow;
+            order.OrderStatus = OrderStatuses.Approved;
+            order.ApprovedAt = DateTime.UtcNow;
+
+            await WriteAuditLogAsync("Orders", order.OrderID, auditAction, null,
+                JsonSerializer.Serialize(new { order.OrderStatus }), performedBy: null);
+
+            await _db.SaveChangesAsync();
+            if (transaction != null) await transaction.CommitAsync();
+        }
+        finally
+        {
+            if (transaction != null) await transaction.DisposeAsync();
+        }
 
         // AI-1/AI-6
         await _orderClassifier.ClassifyAndSaveAsync(order.OrderID);
