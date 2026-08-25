@@ -17,11 +17,13 @@ public class PaymentController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly IPaymentService _paymentService;
+    private readonly IQrCodeService _qrCodeService;
 
-    public PaymentController(ApplicationDbContext db, IPaymentService paymentService)
+    public PaymentController(ApplicationDbContext db, IPaymentService paymentService, IQrCodeService qrCodeService)
     {
         _db = db;
         _paymentService = paymentService;
+        _qrCodeService = qrCodeService;
     }
 
     // Landed on from Module 4's Checkout when paymentMode == Online.
@@ -30,6 +32,9 @@ public class PaymentController : Controller
     {
         var order = await _db.Orders.FirstOrDefaultAsync(o => o.OrderID == orderId);
         if (order is null) return NotFound();
+
+        if (!TableSession.CanAccessOrder(HttpContext.Session, _qrCodeService, order.TableID, orderId))
+            return RedirectToAction("InvalidTable", "Customer");
 
         if (order.OrderStatus != "PendingPayment")
         {
@@ -49,6 +54,7 @@ public class PaymentController : Controller
     // call is straightforward if you'd rather have both layers; flagged here as a known
     // simplification rather than left silently.
     [HttpPost("confirm")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Confirm(int orderId, string razorpayOrderId, string razorpayPaymentId, string razorpaySignature)
     {
         var result = await _paymentService.ConfirmOnlinePaymentAsync(orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature);
@@ -64,8 +70,15 @@ public class PaymentController : Controller
 
     // Called by the browser JS if Razorpay's checkout widget reports failure/dismissal.
     [HttpPost("failed")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Failed(int orderId)
     {
+        var order = await _db.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.OrderID == orderId);
+        if (order is null) return NotFound();
+
+        if (!TableSession.CanAccessOrder(HttpContext.Session, _qrCodeService, order.TableID, orderId))
+            return Forbid();
+
         await _paymentService.MarkOnlinePaymentFailedAsync(orderId);
         return Json(new { success = true });
     }

@@ -104,8 +104,17 @@ public class AccountController : Controller
     [HttpPost]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ResetPassword(string email, string token, string newPassword)
+    public async Task<IActionResult> ResetPassword(string email, string token, string newPassword, string confirmPassword)
     {
+        // Validate that passwords match
+        if (newPassword != confirmPassword)
+        {
+            ModelState.AddModelError(string.Empty, "Passwords do not match. Please try again.");
+            ViewBag.Email = email;
+            ViewBag.Token = token;
+            return View();
+        }
+
         var success = await _passwordResetService.ResetPasswordAsync(email, token, newPassword);
 
         if (!success)

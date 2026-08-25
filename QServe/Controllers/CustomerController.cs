@@ -277,6 +277,9 @@ public class CustomerController : Controller
 
         if (order is null) return NotFound();
 
+        if (!TableSession.CanAccessOrder(HttpContext.Session, _qrCodeService, order.TableID, orderId))
+            return View("InvalidTable");
+
         // Re-order support: how many orders (including this one) has this table placed this
         // session — drives whether Status.cshtml shows "view your other orders" too.
         ViewBag.SessionOrderCount = GetSessionOrderIds(order.TableID).Count;
@@ -290,6 +293,9 @@ public class CustomerController : Controller
         var order = await _db.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.OrderID == orderId);
         if (order is null) return NotFound();
 
+        if (!TableSession.CanAccessOrder(HttpContext.Session, _qrCodeService, order.TableID, orderId))
+            return Forbid();
+
         return Json(new
         {
             orderId = order.OrderID,
@@ -300,11 +306,8 @@ public class CustomerController : Controller
 
     // ---- Session cart helpers ----
 
-    private bool TableSessionValid(int tableId)
-    {
-        var storedToken = HttpContext.Session.GetString(TokenKey(tableId));
-        return storedToken is not null && _qrCodeService.ValidateToken(tableId, storedToken);
-    }
+    private bool TableSessionValid(int tableId) =>
+        TableSession.IsTableSessionValid(HttpContext.Session, _qrCodeService, tableId);
 
     private List<CartItem> GetCart(int tableId)
     {
@@ -337,6 +340,6 @@ public class CustomerController : Controller
     }
 
     private static string CartKey(int tableId) => $"cart:table:{tableId}";
-    private static string TokenKey(int tableId) => $"token:table:{tableId}";
-    private static string OrdersKey(int tableId) => $"orders:table:{tableId}";
+    private static string TokenKey(int tableId) => TableSession.TokenKey(tableId);
+    private static string OrdersKey(int tableId) => TableSession.OrdersKey(tableId);
 }

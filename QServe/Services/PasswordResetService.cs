@@ -12,13 +12,20 @@ public class PasswordResetService : IPasswordResetService
 
     private readonly ApplicationDbContext _db;
     private readonly IEmailSender _emailSender;
+    private readonly IEmailTemplateService _templateService;
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
 
-    public PasswordResetService(ApplicationDbContext db, IEmailSender emailSender, IConfiguration config, IWebHostEnvironment env)
+    public PasswordResetService(
+        ApplicationDbContext db, 
+        IEmailSender emailSender, 
+        IEmailTemplateService templateService,
+        IConfiguration config, 
+        IWebHostEnvironment env)
     {
         _db = db;
         _emailSender = emailSender;
+        _templateService = templateService;
         _config = config;
         _env = env;
     }
@@ -47,13 +54,15 @@ public class PasswordResetService : IPasswordResetService
             ?? throw new InvalidOperationException("App:BaseUrl is not configured.");
         var resetLink = $"{baseUrl}/Account/ResetPassword?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(rawToken)}";
 
+        // Render HTML template
+        var htmlBody = await _templateService.RenderPasswordResetTemplateAsync(
+            user.FullName ?? "User",
+            resetLink);
+
         await _emailSender.SendAsync(new EmailMessage(
             ToEmail: email,
             Subject: "Reset your QServe password",
-            Body: $"Hi {user.FullName},\n\n" +
-                  $"Someone requested a password reset for your QServe account. This link expires in 1 hour:\n\n" +
-                  $"{resetLink}\n\n" +
-                  $"If you didn't request this, you can safely ignore this email — your password won't change."));
+            Body: htmlBody));
 
         return _env.IsDevelopment() ? resetLink : null;
     }
