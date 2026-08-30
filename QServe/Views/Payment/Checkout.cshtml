@@ -4,26 +4,28 @@
 }
 
 <div class="page page--auth" style="text-align:center;">
-    <div class="auth-card" style="max-width:440px;">
-        <img src="~/images/logo.png" alt="QServe" class="brand-logo brand-logo--plain" width="44" height="44" style="margin:0 auto 12px;" />
+    <div class="auth-card" style="max-width:460px;">
+        <div style="margin:0 auto 14px; display:inline-block;">
+            <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "52" }, { "LogoHeight", "52" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
+        </div>
         <span class="table-stamp mono">ORDER #@Model.OrderId.ToString("D5")</span>
 
-        <div style="margin:20px 0; padding:16px; background:var(--surface); border:1px solid var(--border); border-radius:6px;">
-            <span class="eyebrow" style="font-size:11px;">Amount Payable</span>
-            <p class="mono" style="font-size:26px; font-weight:700; margin:4px 0 0; color:var(--turmeric-deep);">
+        <div style="margin:24px 0; padding:20px; background:var(--surface-container-low); border:1px solid var(--outline-subtle); border-radius:var(--radius-lg);">
+            <span class="eyebrow" style="font-size:11px;">Total Amount Payable</span>
+            <p class="mono" style="font-size:32px; font-weight:800; margin:6px 0 0; color:var(--primary);">
                 ₹@((Model.AmountInPaise / 100m).ToString("0.00"))
             </p>
         </div>
 
-        <button id="pay-btn" class="btn btn-primary btn-block" style="padding:15px; font-size:16px; font-weight:700;">
+        <button id="pay-btn" class="btn btn-primary btn-block" style="padding:16px; font-size:16px; font-weight:700; border-radius:var(--radius-pill); box-shadow:0 6px 20px rgba(245, 158, 11, 0.35);">
             Pay Now with Razorpay
         </button>
 
-        <div id="pay-status" style="margin-top:14px; font-size:13px; min-height:20px;"></div>
+        <div id="pay-status" style="margin-top:16px; font-size:13.5px; min-height:22px; font-weight:500;"></div>
 
-        <div style="margin-top:20px; border-top:1px solid var(--border); padding-top:14px;">
-            <a href="/order/status/@Model.OrderId" style="font-size:13px; color:var(--ink-soft); text-decoration:none;">
-                &larr; View Order Status &amp; Details
+        <div style="margin-top:24px; border-top:1px solid var(--surface-container-high); padding-top:16px;">
+            <a href="/order/status/@Model.OrderId" style="font-size:13px; color:var(--on-surface-variant); text-decoration:none;">
+                &larr; Return to Live Order Status
             </a>
         </div>
 
@@ -39,7 +41,7 @@
 
     payBtn.addEventListener("click", function () {
         payBtn.disabled = true;
-        payBtn.textContent = "Opening Checkout...";
+        payBtn.textContent = "Opening Secure Checkout...";
         payStatus.textContent = "";
 
         const options = {
@@ -49,6 +51,9 @@
             name: "QServe Restaurant",
             description: "Order #@Model.OrderId",
             order_id: "@Model.RazorpayOrderId",
+            theme: {
+                color: "#f59e0b"
+            },
             handler: async function (response) {
                 payStatus.textContent = "Verifying payment with restaurant...";
                 try {
@@ -72,34 +77,22 @@
                     } else {
                         payBtn.disabled = false;
                         payBtn.textContent = "Retry Payment";
-                        payStatus.style.color = "var(--tamarind)";
+                        payStatus.style.color = "var(--error)";
                         payStatus.textContent = "Payment verification failed. Please ask staff for assistance.";
                     }
                 } catch (err) {
                     payBtn.disabled = false;
                     payBtn.textContent = "Retry Payment";
-                    payStatus.style.color = "var(--tamarind)";
+                    payStatus.style.color = "var(--error)";
                     payStatus.textContent = "Network error while confirming payment. Please retry.";
                 }
             },
             modal: {
                 ondismiss: function () {
                     payBtn.disabled = false;
-                    payBtn.textContent = "Retry Payment";
-                    payStatus.style.color = "var(--ink-soft)";
-                    payStatus.textContent = "Payment modal closed. Click Retry Payment when you are ready.";
-
-                    fetch("/payment/failed", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/x-www-form-urlencoded",
-                            "RequestVerificationToken": antiforgeryToken
-                        },
-                        body: new URLSearchParams({
-                            orderId: "@Model.OrderId",
-                            __RequestVerificationToken: antiforgeryToken
-                        })
-                    }).catch(() => {});
+                    payBtn.textContent = "Pay Now with Razorpay";
+                    payStatus.style.color = "var(--on-surface-variant)";
+                    payStatus.textContent = "Payment window closed. Click Pay Now when you are ready.";
                 }
             }
         };
@@ -108,7 +101,7 @@
         rzp.on('payment.failed', function (resp) {
             payBtn.disabled = false;
             payBtn.textContent = "Retry Payment";
-            payStatus.style.color = "var(--tamarind)";
+            payStatus.style.color = "var(--error)";
             payStatus.textContent = "Payment was not completed: " + (resp.error?.description || "Gateway error");
         });
         rzp.open();

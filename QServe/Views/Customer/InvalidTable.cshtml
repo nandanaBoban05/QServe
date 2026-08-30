@@ -4,14 +4,16 @@
 
 <div class="page page--auth" style="text-align:center;">
     <div class="auth-card">
-        <img src="~/images/logo.png" alt="QServe" class="brand-logo brand-logo--plain" width="48" height="48" style="margin:0 auto 14px;" />
-        <span class="stamp stamp-tamarind" style="font-size:11px;">Notice</span>
-        <h1 style="font-size:20px; margin-top:14px; margin-bottom:8px;">Table Not Available</h1>
-        <p class="text-muted" style="font-size:14px; line-height:1.5; margin-bottom:20px;">
-            The QR code you scanned is no longer valid or this table is currently inactive. Please scan the QR code located on your table or speak to a restaurant staff member for assistance.
+        <div style="margin:0 auto 16px; display:inline-block;">
+            <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "100" }, { "LogoHeight", "100" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
+        </div>
+        <span class="badge badge-cancelled" style="font-size:12px; margin-bottom:12px;">Notice</span>
+        <h1 class="headline-md" style="margin-top:8px; margin-bottom:10px;">Table Not Available</h1>
+        <p class="text-muted" style="font-size:14px; line-height:1.55; margin-bottom:24px;">
+            The QR code you scanned is no longer active or the table is currently unavailable. Please re-scan the QR code placed at your table or speak to a restaurant server for assistance.
         </p>
-        <div style="background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:12px; font-size:13px; color:var(--ink-soft);">
-            Dining at QServe &middot; Instant Table Ordering
+        <div style="background:var(--surface-container-low); border:1px solid var(--outline-subtle); border-radius:var(--radius-default); padding:14px; font-size:13px; color:var(--on-surface-variant);">
+            QServe Restaurant &middot; Smart Table Ordering
         </div>
     </div>
 </div>

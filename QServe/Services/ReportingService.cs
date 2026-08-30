@@ -25,9 +25,15 @@ public class ReportingService : IReportingService
 
     public async Task<DailySalesSummaryDto> GetDailySalesSummaryAsync(DateTime rangeStart, DateTime rangeEnd)
     {
+        // PRD acceptance criterion (10-prd-reporting-analytics.md, §8): "Daily Sales Summary
+        // total revenue matches the sum of Received payments for the selected date range."
+        // Excluding only Cancelled orders isn't enough — PendingPayment/AwaitingVerification
+        // orders have no confirmed money yet and must not be counted as revenue.
         var orders = await _db.Orders
-            .Include(o => o.Payment)
-            .Where(o => o.CreatedAt >= rangeStart && o.CreatedAt < rangeEnd && o.OrderStatus != OrderStatuses.Cancelled)
+            .Include(o => o.Payments)
+            .Where(o => o.CreatedAt >= rangeStart && o.CreatedAt < rangeEnd
+                        && o.OrderStatus != OrderStatuses.Cancelled
+                        && o.Payments.Any(p => p.PaymentStatus == PaymentStatuses.Received))
             .ToListAsync();
 
         var revenue = orders.Sum(o => o.TotalAmount);
@@ -198,6 +204,27 @@ public class ReportingService : IReportingService
                 Revenue = g.Sum(o => o.TotalAmount)
             })
             .OrderByDescending(x => x.Revenue)
+            .ToList();
+    }
+    // REP-7: "busiest tables by hour" — required by the Reports Specification table (§3) and
+    // REP-7 (§4) alongside the per-table order/revenue ranking above, but previously not built
+    // at all. Same Cancelled-exclusion rule as the rest of this report; CreatedAt.Hour is used
+    // (not ApprovedAt/ServedAt) since this describes when tables place orders, not kitchen timing.
+    public async Task<List<TableHourBucketDto>> GetTableUtilisationByHourAsync(DateTime rangeStart, DateTime rangeEnd)
+    {
+        var orders = await _db.Orders
+            .Include(o => o.Table)
+            .Where(o => o.CreatedAt >= rangeStart && o.CreatedAt < rangeEnd && o.OrderStatus != OrderStatuses.Cancelled)
+            .ToListAsync();
+
+        return orders
+            .GroupBy(o => new { Table = o.Table?.TableNumber ?? "Unknown", Hour = o.CreatedAt.Hour })
+            .Select(g => new TableHourBucketDto
+            {
+                TableNumber = g.Key.Table,
+                Hour = g.Key.Hour,
+                OrderCount = g.Count()
+            })
             .ToList();
     }
 }

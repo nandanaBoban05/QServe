@@ -9,22 +9,31 @@
     <div class="page-head">
         <div>
             <span class="eyebrow">Admin Only</span>
-            <h1>Staff Accounts</h1>
+            <h1 class="headline-lg">Staff Accounts</h1>
         </div>
-        <a asp-action="Create" class="btn btn-primary">+ New Staff</a>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <span class="mono text-muted" style="font-size:13.5px;">Total: <strong>@Model.Users.TotalCount</strong> accounts</span>
+            <a asp-action="Create" class="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                + New Staff Account
+            </a>
+        </div>
     </div>
 
     @if (TempData["StaffMessage"] is string message)
     {
-        <div class="card" style="background:var(--curry-tint); border-color:#b9caae; padding:12px 16px; margin-bottom:16px;">
-            <span style="font-size:13.5px;">@message</span>
+        <div class="card" style="background:var(--status-ready-bg); border-color:var(--status-ready-border); padding:12px 16px; margin-bottom:16px;">
+            <span style="font-size:13.5px; color:var(--status-ready-text); font-weight:500;">@message</span>
         </div>
     }
 
-    <!-- Search & Filter Bar -->
-    <div class="card" style="margin-bottom:20px; padding:18px 20px;">
+    <!-- Standardized Filter Card -->
+    <div class="filter-card">
         <form method="get" asp-action="Index">
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:12px; align-items:flex-end;">
+            <div class="filter-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Search Staff</label>
                     <input type="text" name="Search" value="@Model.Search" placeholder="Name or email..." />
@@ -49,28 +58,42 @@
                     </select>
                 </div>
 
-                <div style="display:flex; gap:6px;">
-                    <button type="submit" class="btn btn-primary btn-sm" style="height:40px; flex:1;">Filter</button>
-                    <a asp-action="Index" class="btn btn-outline btn-sm" style="height:40px; padding:0 12px; display:inline-flex; align-items:center;">Reset</a>
+                <div class="filter-actions">
+                    <a asp-action="Index" class="btn btn-secondary" style="height:38px; padding:0 18px;">Reset</a>
+                    <button type="submit" class="btn btn-primary" style="height:38px; padding:0 22px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                        Filter
+                    </button>
                 </div>
             </div>
         </form>
     </div>
 
-    <!-- Staff Table -->
-    <div class="card">
+    <!-- Staff Table Card -->
+    <div class="card" style="padding:0; overflow:hidden;">
     @if (!Model.Users.Items.Any())
     {
-        <p class="kds-empty">No staff members match the selected criteria.</p>
+        <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <p class="empty-state-text">No staff accounts match the selected criteria.</p>
+            <a asp-action="Index" class="btn btn-secondary btn-sm">Reset Filters</a>
+        </div>
     }
     else
     {
-        <div style="overflow-x:auto;">
+        <div class="data-table-container" style="border:none; border-radius:0;">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Email</th>
+                        <th>Staff Member</th>
+                        <th>Email Address</th>
                         <th>Role</th>
                         <th>Status</th>
                         <th style="text-align:right;">Actions</th>
@@ -81,36 +104,42 @@
                 {
                     var isLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow;
                     <tr class="@(user.IsActive ? "" : "is-dim")">
-                        <td style="font-weight:600;">@user.FullName</td>
-                        <td>@user.Email</td>
-                        <td><span class="badge badge-steel">@user.Role</span></td>
                         <td>
-                            <span class="badge @(user.IsActive ? "badge-curry" : "badge-tamarind")">
-                                @(user.IsActive ? "Active" : "Deactivated")
-                            </span>
+                            <strong style="color:var(--on-surface); font-size:14.5px;">@user.FullName</strong>
                             @if (isLocked)
                             {
-                                <span class="badge badge-tamarind" style="margin-left:4px;">
-                                    Locked (@user.LockoutEnd!.Value.ToString("HH:mm"))
-                                </span>
+                                <span class="badge badge-cancelled" style="margin-left:6px; font-size:11px;">Locked Out</span>
                             }
                         </td>
+                        <td class="mono" style="font-size:13px;">@user.Email</td>
+                        <td><span class="badge badge-neutral">@user.Role</span></td>
+                        <td>
+                            <span class="badge @(user.IsActive ? "badge-ready" : "badge-neutral")">
+                                @(user.IsActive ? "Active" : "Deactivated")
+                            </span>
+                        </td>
                         <td style="text-align:right; white-space:nowrap;">
-                            <a asp-action="Edit" asp-route-userId="@user.UserID" class="btn btn-outline btn-sm">Edit</a>
-                            <a asp-action="ResetPassword" asp-route-userId="@user.UserID" class="btn btn-outline btn-sm">Password</a>
+                            <a asp-action="Edit" asp-route-userId="@user.UserID" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:12px;">
+                                Edit
+                            </a>
+                            <a asp-action="ResetPassword" asp-route-userId="@user.UserID" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:12px;">
+                                Reset Password
+                            </a>
                             @if (isLocked)
                             {
                                 <form asp-action="ClearLockout" method="post" style="display:inline;">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="userId" value="@user.UserID" />
-                                    <button type="submit" class="btn btn-outline btn-sm" style="color:var(--turmeric-deep);">Clear Lockout</button>
+                                    <button type="submit" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:12px; color:var(--status-ready-text);">
+                                        Unlock
+                                    </button>
                                 </form>
                             }
                             <form asp-action="ToggleActive" method="post" style="display:inline;">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="userId" value="@user.UserID" />
-                                <button type="submit" class="btn btn-ghost btn-sm">
-                                    @(user.IsActive ? "Deactivate" : "Reactivate")
+                                <button type="submit" class="btn btn-ghost btn-sm" style="padding:4px 8px;">
+                                    @(user.IsActive ? "Deactivate" : "Activate")
                                 </button>
                             </form>
                         </td>

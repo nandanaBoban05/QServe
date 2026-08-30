@@ -327,4 +327,43 @@ public class AdminTests
         Assert.Equal("OrderCancelled", model.Logs.Items[0].Action);
         Assert.Equal(102, model.Logs.Items[0].EntityID);
     }
+
+    [Fact]
+    public async Task CancelOrder_WhenAllowed_CancelsOrderAndLogsAudit()
+    {
+        var table = new RestaurantTable { TableNumber = "T1", IsActive = true };
+        var order = new Order { Table = table, OrderStatus = OrderStatuses.Approved, TotalAmount = 250 };
+        _db.RestaurantTables.Add(table);
+        _db.Orders.Add(order);
+        await _db.SaveChangesAsync();
+
+        var result = await _adminController.CancelOrder(order.OrderID, "Customer walked out") as RedirectToActionResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(nameof(AdminController.OrderDetails), result.ActionName);
+
+        var dbOrder = await _db.Orders.FindAsync(order.OrderID);
+        Assert.NotNull(dbOrder);
+        Assert.Equal(OrderStatuses.Cancelled, dbOrder.OrderStatus);
+
+        var audit = await _db.AuditLogs.FirstOrDefaultAsync(a => a.EntityType == "Orders" && a.EntityID == order.OrderID && a.Action == "OrderCancelledByStaff");
+        Assert.NotNull(audit);
+        Assert.Contains("Customer walked out", audit.NewValue);
+    }
+
+    [Fact]
+    public async Task CancelOrder_WhenAlreadyCancelled_SetsErrorInTempData()
+    {
+        var table = new RestaurantTable { TableNumber = "T1", IsActive = true };
+        var order = new Order { Table = table, OrderStatus = OrderStatuses.Cancelled, TotalAmount = 250 };
+        _db.RestaurantTables.Add(table);
+        _db.Orders.Add(order);
+        await _db.SaveChangesAsync();
+
+        var result = await _adminController.CancelOrder(order.OrderID, "Double cancel test") as RedirectToActionResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(nameof(AdminController.OrderDetails), result.ActionName);
+        Assert.NotNull(_adminController.TempData["OrderDetailsError"]);
+    }
 }

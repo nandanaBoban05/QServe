@@ -143,4 +143,42 @@ app.MapControllerRoute(
 app.MapHub<KitchenHub>("/hubs/kitchen");
 app.MapHealthChecks("/health");
 
+// Automatically ensure RejectionReason column and Payments index are up to date on SQL Server
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    try
+    {
+        if (db.Database.IsSqlServer())
+        {
+            db.Database.ExecuteSqlRaw(@"
+                IF NOT EXISTS (
+                    SELECT 1 FROM sys.columns 
+                    WHERE Name = N'RejectionReason' 
+                    AND Object_ID = Object_ID(N'Payments')
+                )
+                BEGIN
+                    ALTER TABLE Payments ADD RejectionReason NVARCHAR(255) NULL;
+                END;
+
+                IF EXISTS (
+                    SELECT 1 FROM sys.indexes 
+                    WHERE name = N'IX_Payments_OrderID' 
+                    AND object_id = OBJECT_ID(N'Payments') 
+                    AND is_unique = 1
+                )
+                BEGIN
+                    DROP INDEX IX_Payments_OrderID ON Payments;
+                    CREATE INDEX IX_Payments_OrderID ON Payments(OrderID);
+                END;
+            ");
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
+        logger?.LogWarning(ex, "Could not run automated schema update for Payments.RejectionReason.");
+    }
+}
+
 app.Run();

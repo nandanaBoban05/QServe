@@ -1,31 +1,48 @@
+using QServe.Models;
+
 namespace QServe.ViewModels;
 
 /// <summary>
-/// View-only shape for the Admin dashboard landing page (ADM-7) — not persisted, not a
-/// broadcast payload (that's Hubs/RealtimeDtos.cs). Non-persisted, view-only classes like this
-/// belong here rather than in Models/ (entities) or Hubs/ (SignalR payloads).
+/// View model for the operational real-time Admin Command Center dashboard.
+/// Prioritizes live restaurant and kitchen operations.
 /// </summary>
 public class AdminDashboardStats
 {
-    public int TodayOrderCount { get; set; }
+    // ---- Top-level KPI Metrics ----
     public decimal TodayRevenue { get; set; }
-    public int TodayCompletedOrderCount { get; set; }
-    public int TodayCancelledOrderCount { get; set; }
-    public decimal TodayOnlineRevenue { get; set; }
-    public decimal TodayOfflineRevenue { get; set; }
+    public decimal YesterdayRevenue { get; set; }
+    public int TodayOrderCount { get; set; }
+    public int ActiveOrderCount { get; set; }
+    public int PendingActionCount { get; set; }
     public int PendingVerificationCount { get; set; }
 
-    // Added for the improved dashboard pass: operational counts that give a real system feel
-    // rather than just the three payment-focused figures above.
-    public int ActiveOrderCount { get; set; }
+    // ---- Kitchen Activity Live Status Counts ----
+    public int NewOrdersCount { get; set; }
+    public int PreparingOrdersCount { get; set; }
+    public int ReadyOrdersCount { get; set; }
+    public int CompletedOrdersCount { get; set; }
+
+    // ---- Live Active Kitchen Order Tickets ----
+    public List<Order> ActiveKitchenOrders { get; set; } = new();
+
+    // ---- Recent Order Stream (5-10 latest) ----
+    public List<Order> RecentOrders { get; set; } = new();
+
+    // ---- Quick Operational & Sales Summary ----
+    public decimal TodayOnlineRevenue { get; set; }
+    public decimal TodayOfflineRevenue { get; set; }
+    public int TodayCompletedOrderCount { get; set; }
+    public int TodayCancelledOrderCount { get; set; }
+    public decimal AverageOrderValue => TodayOrderCount > 0 ? (TodayRevenue / TodayOrderCount) : 0m;
     public int ActiveTableCount { get; set; }
     public int MenuItemCount { get; set; }
     public int ActiveStaffCount { get; set; }
 
-    // 7-day trend for the dashboard chart — oldest first.
-    public List<DailyTrendPoint> WeekTrend { get; set; } = new();
-
+    // ---- Recent Activity Feed (Audit Log) ----
     public List<RecentActivityItem> RecentActivity { get; set; } = new();
+
+    // ---- Historical Trend (accessible via Analytics / Reports) ----
+    public List<DailyTrendPoint> WeekTrend { get; set; } = new();
 }
 
 public class DailyTrendPoint

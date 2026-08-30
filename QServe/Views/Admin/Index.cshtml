@@ -1,164 +1,295 @@
 @model QServe.ViewModels.AdminDashboardStats
 @{
-    ViewData["Title"] = "Dashboard";
+    ViewData["Title"] = "Overview";
 }
 
 <partial name="_AdminNav" />
 
 <div class="page">
-    <span class="eyebrow">Overview</span>
-    <h1>Dashboard</h1>
+    <!-- Header -->
+    <div class="page-head">
+        <div>
+            <h1 class="headline-lg">Overview</h1>
+            <p class="body-md text-muted" style="margin-top: 4px;">Today's snapshot and key metrics.</p>
+        </div>
+        <div style="display:flex; gap:12px; align-items:center;">
+            <span class="text-muted" style="font-size:12px; font-weight:500;">Last updated: Just now</span>
+            <a asp-action="Index" class="btn btn-secondary btn-sm" style="padding:7px; border-radius:50%;" title="Refresh dashboard data">
+                <span class="material-symbols-outlined" style="font-size:18px;">refresh</span>
+            </a>
+        </div>
+    </div>
 
-    <!-- Primary Daily Metrics -->
-    <div class="stat-grid mt-lg">
+    <!-- 1. KPI CARDS GRID -->
+    <div class="stat-grid">
+        <!-- Today's Revenue -->
         <div class="stat-card">
-            <div class="stat-value">@Model.TodayOrderCount</div>
-            <div class="stat-label">Orders Today</div>
+            <div class="stat-card__head">
+                <span class="stat-label">Today's Revenue</span>
+                <div class="stat-icon-chip stat-icon-chip--primary">
+                    <span class="material-symbols-outlined" style="font-size:16px;">currency_rupee</span>
+                </div>
+            </div>
+            <div class="stat-value">₹@Model.TodayRevenue.ToString("N0")</div>
+            <div style="display:flex; align-items:center; gap:4px; margin-top:6px; font-size:12px; font-weight:600; color:var(--primary);">
+                <span class="material-symbols-outlined" style="font-size:16px;">trending_up</span>
+                @{
+                    var diff = Model.TodayRevenue - Model.YesterdayRevenue;
+                    if (Model.YesterdayRevenue > 0)
+                    {
+                        var pct = (diff / Model.YesterdayRevenue) * 100m;
+                        <span>@(pct >= 0 ? $"+{pct:0.0}% vs yesterday" : $"{pct:0.0}% vs yesterday")</span>
+                    }
+                    else
+                    {
+                        <span>₹@Model.TodayRevenue.ToString("N0") settled</span>
+                    }
+                }
+            </div>
         </div>
+
+        <!-- Active Orders -->
         <div class="stat-card">
-            <div class="stat-value">₹@Model.TodayRevenue.ToString("0.00")</div>
-            <div class="stat-label">Total Revenue Today</div>
-        </div>
-        <div class="stat-card @(Model.PendingVerificationCount > 0 ? "stat-alert" : "")">
-            <div class="stat-value">@Model.PendingVerificationCount</div>
-            <div class="stat-label">Awaiting Payment Verification</div>
-        </div>
-        <div class="stat-card">
+            <div class="stat-card__head">
+                <span class="stat-label">Active Orders</span>
+                <div class="stat-icon-chip stat-icon-chip--neutral">
+                    <span class="material-symbols-outlined" style="font-size:16px;">receipt_long</span>
+                </div>
+            </div>
             <div class="stat-value">@Model.ActiveOrderCount</div>
-            <div class="stat-label">Active Orders In Kitchen/Floor</div>
+            <div class="text-muted" style="font-size:12px; font-weight:500; margin-top:6px;">
+                Across <strong>@Model.ActiveTableCount</strong> active tables
+            </div>
+        </div>
+
+        <!-- Pending Verifications -->
+        <div class="stat-card @(Model.PendingActionCount > 0 ? "stat-alert" : "")">
+            <div class="stat-card__head">
+                <span class="stat-label">Pending Verifications</span>
+                <div class="stat-icon-chip stat-icon-chip--alert">
+                    <span class="material-symbols-outlined" style="font-size:16px;">pending_actions</span>
+                </div>
+            </div>
+            <div class="stat-value" style="@(Model.PendingActionCount > 0 ? "color:var(--error);" : "")">
+                @Model.PendingActionCount
+            </div>
+            <div style="margin-top:6px; font-size:12px; font-weight:600;">
+                @if (Model.PendingVerificationCount > 0)
+                {
+                    <a asp-action="PaymentQueue" style="color:var(--error); text-decoration:underline;">
+                        Requires attention (@Model.PendingVerificationCount pending)
+                    </a>
+                }
+                else
+                {
+                    <span class="text-muted" style="font-weight:500;">All payments verified</span>
+                }
+            </div>
+        </div>
+
+        <!-- Today's Total Orders -->
+        <div class="stat-card">
+            <div class="stat-card__head">
+                <span class="stat-label">Today's Orders</span>
+                <div class="stat-icon-chip stat-icon-chip--neutral">
+                    <span class="material-symbols-outlined" style="font-size:16px;">timer</span>
+                </div>
+            </div>
+            <div class="stat-value">@(Model.TodayOrderCount + Model.TodayCancelledOrderCount)</div>
+            <div class="text-muted" style="font-size:12px; font-weight:500; margin-top:6px;">
+                <span style="color:var(--status-ready-text); font-weight:600;">@Model.CompletedOrdersCount served</span> &middot; @Model.TodayCancelledOrderCount cancelled
+            </div>
         </div>
     </div>
 
-    <!-- Secondary Operational Metrics -->
-    <div class="stat-grid mt-lg" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
-        <div class="stat-card stat-card--sm">
-            <div class="stat-value" style="font-size:20px; color:var(--curry);">@Model.TodayCompletedOrderCount</div>
-            <div class="stat-label">Served Today</div>
-        </div>
-        <div class="stat-card stat-card--sm">
-            <div class="stat-value" style="font-size:20px; color:var(--tamarind);">@Model.TodayCancelledOrderCount</div>
-            <div class="stat-label">Cancelled Today</div>
-        </div>
-        <div class="stat-card stat-card--sm">
-            <div class="stat-value" style="font-size:18px;">₹@Model.TodayOnlineRevenue.ToString("0.00")</div>
-            <div class="stat-label">Online (Razorpay)</div>
-        </div>
-        <div class="stat-card stat-card--sm">
-            <div class="stat-value" style="font-size:18px;">₹@Model.TodayOfflineRevenue.ToString("0.00")</div>
-            <div class="stat-label">Cash &amp; Card</div>
-        </div>
-        <div class="stat-card stat-card--sm">
-            <div class="stat-value" style="font-size:20px;">@Model.ActiveTableCount</div>
-            <div class="stat-label">Active Tables</div>
-        </div>
-        <div class="stat-card stat-card--sm">
-            <div class="stat-value" style="font-size:20px;">@Model.MenuItemCount</div>
-            <div class="stat-label">Menu Items</div>
-        </div>
-        <div class="stat-card stat-card--sm">
-            <div class="stat-value" style="font-size:20px;">@Model.ActiveStaffCount</div>
-            <div class="stat-label">Active Staff</div>
-        </div>
-    </div>
+    <!-- 2. TWO-COLUMN BENTO GRID: KITCHEN ACTIVITY & RECENT ORDERS -->
+    <div style="display:grid; grid-template-columns: 1fr 1.35fr; gap:24px; align-items:start;" class="mt-lg">
+        
+        <!-- Kitchen Activity Section (Left Column) -->
+        <div class="card" style="display:flex; flex-direction:column; height:100%;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                <div>
+                    <h2 class="headline-md" style="font-size:18px;">Kitchen Activity</h2>
+                    <p class="text-muted" style="font-size:12px; margin-top:2px;">Real-time queue and ticket pipeline monitoring</p>
+                </div>
+                <a asp-controller="Kitchen" asp-action="Index" target="_blank" class="btn btn-secondary btn-sm" style="font-size:12px;">
+                    <span class="material-symbols-outlined" style="font-size:15px;">tv</span>
+                    <span>Fullscreen KDS</span>
+                </a>
+            </div>
 
-    <div class="dash-grid mt-lg">
-        <div class="card">
-            <h3 style="margin-bottom:14px;">7-Day Sales &amp; Orders Trend</h3>
-            <canvas id="trendChart" height="180"></canvas>
+            <!-- Status State Summary Rows -->
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background-color:var(--surface-container-low); border:1px solid var(--outline-variant); border-radius:var(--radius-lg);">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="width:8px; height:8px; border-radius:50%; background-color:var(--error); display:inline-block;"></span>
+                        <span style="font-size:14px; font-weight:500; color:var(--on-surface);">New</span>
+                    </div>
+                    <span class="mono" style="font-size:18px; font-weight:700; color:var(--on-surface);">@Model.NewOrdersCount</span>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background-color:#fffbeb; border:1px solid var(--primary-container); border-radius:var(--radius-lg);">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="width:8px; height:8px; border-radius:50%; background-color:var(--primary-container); display:inline-block;"></span>
+                        <span style="font-size:14px; font-weight:600; color:var(--on-surface);">Preparing</span>
+                    </div>
+                    <span class="mono" style="font-size:18px; font-weight:700; color:var(--primary);">@Model.PreparingOrdersCount</span>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background-color:var(--surface-container-low); border:1px solid var(--outline-variant); border-radius:var(--radius-lg);">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="width:8px; height:8px; border-radius:50%; background-color:var(--status-ready-text); display:inline-block;"></span>
+                        <span style="font-size:14px; font-weight:500; color:var(--on-surface);">Ready</span>
+                    </div>
+                    <span class="mono" style="font-size:18px; font-weight:700; color:var(--on-surface);">@Model.ReadyOrdersCount</span>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background-color:var(--surface-container-low); border:1px solid var(--outline-variant); border-radius:var(--radius-lg);">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="width:8px; height:8px; border-radius:50%; background-color:var(--secondary); display:inline-block;"></span>
+                        <span style="font-size:14px; font-weight:500; color:var(--on-surface);">Served Today</span>
+                    </div>
+                    <span class="mono" style="font-size:18px; font-weight:700; color:var(--on-surface);">@Model.CompletedOrdersCount</span>
+                </div>
+            </div>
         </div>
 
-        <div class="card">
-            <h3 style="margin-bottom:12px;">Recent Audit Activity</h3>
-            @if (!Model.RecentActivity.Any())
+        <!-- Recent Orders Table (Right Column) -->
+        <div class="card" style="padding:0; overflow:hidden;">
+            <div style="padding:16px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--outline-variant); background-color:var(--surface-container-lowest);">
+                <h2 class="headline-md" style="font-size:18px;">Recent Orders</h2>
+                <a asp-action="Orders" class="btn btn-ghost btn-sm" style="font-size:12.5px; color:var(--primary); font-weight:600;">
+                    View All &rarr;
+                </a>
+            </div>
+
+            @if (!Model.RecentOrders.Any())
             {
-                <p class="kds-empty">Nothing recorded yet.</p>
+                <div class="empty-state" style="padding:28px 16px;">
+                    <p class="text-muted" style="font-size:13px; margin:0;">No orders placed yet today.</p>
+                </div>
             }
             else
             {
-                <ul class="activity-feed">
-                    @foreach (var item in Model.RecentActivity)
-                    {
-                        <li>
-                            <span class="activity-dot"></span>
-                            <div>
-                                <div style="font-size:13px;">
-                                    <strong>@(item.PerformedByName ?? "System")</strong>
-                                    @item.Action.Replace("_", " ")
-                                    <span class="text-muted">· @item.EntityType #@item.EntityID</span>
-                                </div>
-                                <div class="text-muted mono" style="font-size:11px;">@item.Timestamp.ToString("MMM d, HH:mm")</div>
-                            </div>
-                        </li>
-                    }
-                </ul>
-                <a asp-action="AuditLog" style="font-size:12px;">View full audit log →</a>
+                <div class="data-table-container" style="border:none; border-radius:0; overflow-x:auto;">
+                    <table class="data-table" style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr>
+                                <th style="padding:12px 16px;">Order ID</th>
+                                <th style="padding:12px 16px;">Table</th>
+                                <th style="padding:12px 16px;">Amount</th>
+                                <th style="padding:12px 16px;">Status</th>
+                                <th style="text-align:right; padding:12px 16px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var order in Model.RecentOrders.Take(6))
+                        {
+                            <tr style="border-bottom:1px solid var(--surface-container);">
+                                <td class="num" style="padding:12px 16px;">
+                                    <a asp-action="OrderDetails" asp-route-id="@order.OrderID" style="font-weight:700; color:var(--primary); text-decoration:none; font-size:13.5px;">
+                                        #@order.OrderID.ToString("D5")
+                                    </a>
+                                </td>
+                                <td style="padding:12px 16px; font-weight:600; color:var(--on-surface);">Table @(order.Table?.TableNumber ?? "-")</td>
+                                <td class="num" style="padding:12px 16px; font-weight:700; color:var(--on-surface); font-size:14px;">₹@order.TotalAmount.ToString("N0")</td>
+                                <td style="padding:12px 16px;">
+                                    @{
+                                        string statusClass = order.OrderStatus switch {
+                                            "Approved" => "badge-approved",
+                                            "Preparing" => "badge-preparing",
+                                            "Ready" => "badge-ready",
+                                            "Served" => "badge-served",
+                                            "Cancelled" => "badge-cancelled",
+                                            "PendingPayment" => "badge-pending",
+                                            "AwaitingVerification" => "badge-awaiting",
+                                            _ => "badge-neutral"
+                                        };
+                                    }
+                                    <span class="badge @statusClass" style="font-size:11.5px; padding:3px 10px;">@order.OrderStatus</span>
+                                </td>
+                                <td style="text-align:right; padding:12px 16px;">
+                                    <a asp-action="OrderDetails" asp-route-id="@order.OrderID" class="btn btn-secondary btn-sm" style="padding:5px 12px; font-size:12px; font-weight:600;">
+                                        View
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
             }
         </div>
     </div>
 
-    <h3 class="mt-lg" style="margin-bottom:12px;">Quick Actions</h3>
-    <div class="quick-actions">
-        <a class="quick-action" asp-controller="Admin" asp-action="Orders">
-            <strong>Order Management</strong>
-            <span>Monitor and filter all live &amp; past orders</span>
-        </a>
-        <a class="quick-action" asp-controller="Admin" asp-action="PaymentQueue">
-            <strong>Verify Payments</strong>
-            <span>@Model.PendingVerificationCount pending staff check</span>
-        </a>
-        <a class="quick-action" asp-controller="Admin" asp-action="Payments">
-            <strong>Payment Management</strong>
-            <span>Search receipts &amp; refunds</span>
-        </a>
-        <a class="quick-action" asp-controller="AdminMenu" asp-action="CreateItem">
-            <strong>+ Add Menu Item</strong>
-            <span>Expand food &amp; drinks catalog</span>
-        </a>
-        <a class="quick-action" asp-controller="Admin" asp-action="Tables">
-            <strong>Manage Tables</strong>
-            <span>Floor plan &amp; customer QR codes</span>
-        </a>
+    <!-- 3. TODAY'S SALES BREAKDOWN (Prominently Placed Below) -->
+    <div class="card mt-lg">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+            <div>
+                <h3 style="font-size:18px; font-weight:700; margin:0;">Today's Sales Breakdown</h3>
+                <p class="text-muted" style="font-size:12.5px; margin-top:2px;">Real-time settlement and ticket value telemetry</p>
+            </div>
+            <a asp-controller="AdminReports" asp-action="Sales" class="btn btn-ghost btn-sm" style="font-size:13px; color:var(--primary); font-weight:600;">
+                Detailed Reports &rarr;
+            </a>
+        </div>
+
+        <!-- 2x2 Desktop Grid of Metric Blocks -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
+            <div style="background-color:var(--surface-container-low); border:1px solid var(--outline-variant); border-radius:var(--radius-lg); padding:16px 18px;">
+                <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Average Order Value (AOV)</div>
+                <div class="mono" style="font-size:24px; font-weight:700; color:var(--on-surface); margin-top:6px;">
+                    ₹@Model.AverageOrderValue.ToString("0.00")
+                </div>
+                <div class="text-muted" style="font-size:11.5px; margin-top:4px;">Across @Model.TodayOrderCount orders</div>
+            </div>
+
+            <div style="background-color:var(--surface-container-low); border:1px solid var(--outline-variant); border-radius:var(--radius-lg); padding:16px 18px;">
+                <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Online (UPI / Card)</div>
+                <div class="mono" style="font-size:24px; font-weight:700; color:var(--primary); margin-top:6px;">
+                    ₹@Model.TodayOnlineRevenue.ToString("0.00")
+                </div>
+                <div class="text-muted" style="font-size:11.5px; margin-top:4px;">Direct Razorpay settlement</div>
+            </div>
+
+            <div style="background-color:var(--surface-container-low); border:1px solid var(--outline-variant); border-radius:var(--radius-lg); padding:16px 18px;">
+                <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Cash &amp; POS Card</div>
+                <div class="mono" style="font-size:24px; font-weight:700; color:var(--on-surface); margin-top:6px;">
+                    ₹@Model.TodayOfflineRevenue.ToString("0.00")
+                </div>
+                <div class="text-muted" style="font-size:11.5px; margin-top:4px;">Offline verified revenue</div>
+            </div>
+
+            <div style="background-color:var(--surface-container-low); border:1px solid var(--outline-variant); border-radius:var(--radius-lg); padding:16px 18px;">
+                <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Active Floor Tables</div>
+                <div class="mono" style="font-size:24px; font-weight:700; color:var(--on-surface); margin-top:6px;">
+                    @Model.ActiveTableCount tables
+                </div>
+                <div class="text-muted" style="font-size:11.5px; margin-top:4px;">Configured &amp; operational</div>
+            </div>
+        </div>
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
 <script>
-    const labels = [@Html.Raw(string.Join(",", Model.WeekTrend.Select(d => $"'{d.Date:ddd}'")))];
-    const revenue = [@string.Join(",", Model.WeekTrend.Select(d => d.Revenue.ToString(System.Globalization.CultureInfo.InvariantCulture)))];
-    const orderCounts = [@string.Join(",", Model.WeekTrend.Select(d => d.OrderCount))];
+    // SignalR real-time reconnection & live reload for kitchen and payment changes
+    let reloadDebounce = null;
+    function triggerDashboardRefresh() {
+        if (reloadDebounce) clearTimeout(reloadDebounce);
+        reloadDebounce = setTimeout(() => {
+            window.location.reload();
+        }, 800);
+    }
 
-    const ctx = document.getElementById('trendChart');
-    new Chart(ctx, {
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    type: 'bar',
-                    label: 'Revenue (₹)',
-                    data: revenue,
-                    backgroundColor: '#CC9A06',
-                    borderRadius: 4,
-                    yAxisID: 'y'
-                },
-                {
-                    type: 'line',
-                    label: 'Orders',
-                    data: orderCounts,
-                    borderColor: '#8C2F1B',
-                    backgroundColor: '#8C2F1B',
-                    tension: 0.3,
-                    yAxisID: 'y1'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            interaction: { mode: 'index', intersect: false },
-            scales: {
-                y: { position: 'left', beginAtZero: true, title: { display: true, text: 'Revenue (₹)' } },
-                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: 'Orders' }, ticks: { stepSize: 1 } }
-            },
-            plugins: { legend: { position: 'bottom', labels: { font: { family: 'IBM Plex Sans' } } } }
-        }
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/hubs/kitchen")
+        .withAutomaticReconnect([0, 2000, 5000, 10000])
+        .build();
+
+    connection.on("OrderStatusUpdate", () => triggerDashboardRefresh());
+    connection.on("PaymentPendingVerification", () => triggerDashboardRefresh());
+    connection.start().catch(err => {
+        console.warn("SignalR connection failed, dashboard will use fallback:", err);
     });
 </script>

@@ -52,13 +52,30 @@ public class PaymentService : IPaymentService
 
     public async Task<RazorpayCheckoutInfo> InitiateOnlinePaymentAsync(int orderId)
     {
-        var order = await _db.Orders.Include(o => o.Payment).FirstOrDefaultAsync(o => o.OrderID == orderId)
-            ?? throw new InvalidOperationException($"Order {orderId} not found.");
+        var order = await _db.Orders.Include(o => o.Payments).FirstOrDefaultAsync(o => o.OrderID == orderId)
+            ?? throw new InvalidOperationException($"Order #{orderId} not found.");
 
-        if (order.Payment is null || order.Payment.PaymentMode != PaymentModes.Online)
-            throw new InvalidOperationException($"Order {orderId} is not an online-payment order.");
+        if (order.OrderStatus != OrderStatuses.PendingPayment)
+            throw new InvalidOperationException($"Order #{orderId} is in status '{order.OrderStatus}' and is not eligible for payment.");
+
+        var payment = order.Payment
+            ?? throw new InvalidOperationException($"Order #{orderId} has no active payment record.");
+
+        if (payment.PaymentMode != PaymentModes.Online)
+            throw new InvalidOperationException($"Order #{orderId} has payment mode '{payment.PaymentMode}', not '{PaymentModes.Online}'.");
 
         var amountInPaise = (long)(order.TotalAmount * 100);
+
+        // If an active Razorpay order ID already exists on this pending payment attempt, reuse it (idempotency on GET/refresh)
+        if (!string.IsNullOrEmpty(payment.RazorpayOrderID) && (payment.PaymentStatus == PaymentStatuses.Processing || payment.PaymentStatus == PaymentStatuses.Pending))
+        {
+            return new RazorpayCheckoutInfo(
+                RazorpayOrderId: payment.RazorpayOrderID,
+                KeyId: _config["Razorpay:KeyId"]!,
+                AmountInPaise: amountInPaise,
+                Currency: "INR",
+                OrderId: orderId);
+        }
 
         var requestBody = JsonSerializer.Serialize(new
         {
@@ -75,8 +92,8 @@ public class PaymentService : IPaymentService
         var razorpayOrderId = responseJson.RootElement.GetProperty("id").GetString()
             ?? throw new InvalidOperationException("Razorpay did not return an order id.");
 
-        order.Payment.RazorpayOrderID = razorpayOrderId;
-        order.Payment.PaymentStatus = PaymentStatuses.Processing;
+        payment.RazorpayOrderID = razorpayOrderId;
+        payment.PaymentStatus = PaymentStatuses.Processing;
         await _db.SaveChangesAsync();
 
         return new RazorpayCheckoutInfo(
@@ -90,7 +107,7 @@ public class PaymentService : IPaymentService
     public async Task<ConfirmResult> ConfirmOnlinePaymentAsync(
         int orderId, string razorpayOrderId, string razorpayPaymentId, string razorpaySignature)
     {
-        var order = await _db.Orders.Include(o => o.Payment).Include(o => o.Table)
+        var order = await _db.Orders.Include(o => o.Payments).Include(o => o.Table)
             .FirstOrDefaultAsync(o => o.OrderID == orderId);
         if (order?.Payment is null) return ConfirmResult.OrderNotFound;
 
@@ -185,15 +202,13 @@ public class PaymentService : IPaymentService
 
     public async Task MarkOnlinePaymentFailedAsync(int orderId)
     {
-        var order = await _db.Orders.Include(o => o.Payment).Include(o => o.Table)
+        var order = await _db.Orders.Include(o => o.Payments).Include(o => o.Table)
             .FirstOrDefaultAsync(o => o.OrderID == orderId);
         if (order?.Payment is null) return;
 
-        if (!OrderStatusStateMachine.CanTransition(order.OrderStatus, OrderStatuses.Cancelled))
-            return;
-
         order.Payment.PaymentStatus = PaymentStatuses.Failed;
-        order.OrderStatus = OrderStatuses.Cancelled;
+        order.Payment.RejectionReason = "Payment window dismissed or failed";
+        order.OrderStatus = OrderStatuses.PendingPayment;
 
         await WriteAuditLogAsync("Orders", order.OrderID, "OnlinePaymentFailed", null, null, performedBy: null);
         await _db.SaveChangesAsync();
@@ -202,7 +217,7 @@ public class PaymentService : IPaymentService
             order.OrderID, order.Table?.TableNumber ?? "", order.OrderStatus, DateTime.UtcNow));
     }
 
-    public async Task AdminVerifyAsync(int paymentId, bool approve, int adminUserId)
+    public async Task AdminVerifyAsync(int paymentId, bool approve, int adminUserId, string? rejectionReason = null)
     {
         var payment = await _db.Payments.Include(p => p.Order).ThenInclude(o => o!.Table)
             .FirstOrDefaultAsync(p => p.PaymentID == paymentId)
@@ -215,7 +230,7 @@ public class PaymentService : IPaymentService
         if (payment.PaymentStatus != PaymentStatuses.Pending)
             return;
 
-        var targetStatus = approve ? OrderStatuses.Approved : OrderStatuses.Cancelled;
+        var targetStatus = approve ? OrderStatuses.Approved : OrderStatuses.PendingPayment;
         if (!OrderStatusStateMachine.CanTransition(payment.Order.OrderStatus, targetStatus))
             throw new InvalidOperationException($"Cannot transition Order #{payment.Order.OrderID} from '{payment.Order.OrderStatus}' to '{targetStatus}'.");
 
@@ -232,15 +247,17 @@ public class PaymentService : IPaymentService
         else
         {
             payment.PaymentStatus = PaymentStatuses.Failed;
+            payment.RejectionReason = string.IsNullOrWhiteSpace(rejectionReason) ? "Rejected by staff" : rejectionReason.Trim();
             payment.VerifiedBy = adminUserId;
             payment.VerificationTime = DateTime.UtcNow;
-            payment.Order.OrderStatus = OrderStatuses.Cancelled;
+            // Preserves the order, items, and total — transitions to PendingPayment to allow customer to pay again
+            payment.Order.OrderStatus = OrderStatuses.PendingPayment;
         }
 
         await WriteAuditLogAsync("Payments", payment.PaymentID,
             approve ? "PaymentVerified" : "PaymentRejected",
             JsonSerializer.Serialize(new { OrderStatus = oldStatus }),
-            JsonSerializer.Serialize(new { OrderStatus = payment.Order.OrderStatus }),
+            JsonSerializer.Serialize(new { OrderStatus = payment.Order.OrderStatus, RejectionReason = payment.RejectionReason }),
             adminUserId);
 
         await _db.SaveChangesAsync();
@@ -254,6 +271,80 @@ public class PaymentService : IPaymentService
         await _realtime.BroadcastOrderStatusUpdateAsync(new OrderStatusUpdateDto(
             payment.Order.OrderID, payment.Order.Table?.TableNumber ?? "", payment.Order.OrderStatus,
             payment.Order.ApprovedAt ?? DateTime.UtcNow));
+    }
+
+    public async Task<Payment> InitiateRepaymentAsync(int orderId, string paymentMode)
+    {
+        if (paymentMode is not (PaymentModes.Online or PaymentModes.Cash or PaymentModes.Card))
+            throw new ArgumentException("Invalid payment mode.", nameof(paymentMode));
+
+        var order = await _db.Orders
+            .Include(o => o.Table)
+            .Include(o => o.OrderItems).ThenInclude(oi => oi.Item)
+            .Include(o => o.Payments)
+            .FirstOrDefaultAsync(o => o.OrderID == orderId)
+            ?? throw new InvalidOperationException($"Order #{orderId} not found.");
+
+        if (order.OrderStatus != OrderStatuses.PendingPayment)
+        {
+            throw new InvalidOperationException($"Order #{orderId} is {order.OrderStatus.ToLowerInvariant()} and can no longer be paid.");
+        }
+
+        // Server-side recalculate and validate total and availability from database items
+        var itemIds = order.OrderItems.Select(oi => oi.ItemID).ToList();
+        var currentItems = await _db.MenuItems
+            .Include(m => m.Category)
+            .Where(m => itemIds.Contains(m.ItemID))
+            .ToDictionaryAsync(m => m.ItemID);
+
+        decimal total = 0;
+        foreach (var item in order.OrderItems)
+        {
+            if (!currentItems.TryGetValue(item.ItemID, out var dbItem)
+                || !dbItem.IsAvailable
+                || (dbItem.Category != null && !dbItem.Category.IsActive))
+            {
+                var itemName = item.Item?.Name ?? dbItem?.Name ?? $"Item #{item.ItemID}";
+                throw new InvalidOperationException($"Item \"{itemName}\" is no longer available. Please inform staff or place a new order.");
+            }
+
+            item.UnitPrice = dbItem.Price;
+            total += item.UnitPrice * item.Quantity;
+        }
+        order.TotalAmount = total;
+
+        // Create new Payment attempt, preserving previous payments as history
+        var newPayment = new Payment
+        {
+            OrderID = order.OrderID,
+            PaymentMode = paymentMode,
+            PaymentStatus = PaymentStatuses.Pending,
+            Amount = total,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        order.Payments.Add(newPayment);
+        order.OrderStatus = paymentMode == PaymentModes.Online
+            ? OrderStatuses.PendingPayment
+            : OrderStatuses.AwaitingVerification;
+
+        await WriteAuditLogAsync("Payments", order.OrderID, "RepaymentInitiated",
+            null,
+            JsonSerializer.Serialize(new { OrderID = order.OrderID, PaymentMode = paymentMode, Amount = total }),
+            null);
+
+        await _db.SaveChangesAsync();
+
+        if (paymentMode != PaymentModes.Online)
+        {
+            await _realtime.BroadcastPaymentPendingAsync(new PaymentPendingDto(
+                newPayment.PaymentID, order.Table?.TableNumber ?? "", paymentMode, total));
+        }
+
+        await _realtime.BroadcastOrderStatusUpdateAsync(new OrderStatusUpdateDto(
+            order.OrderID, order.Table?.TableNumber ?? "", order.OrderStatus, DateTime.UtcNow));
+
+        return newPayment;
     }
 
     public async Task RefundAsync(int paymentId, int adminUserId)

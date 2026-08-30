@@ -2,58 +2,81 @@
 @{
     ViewData["Title"] = "Kitchen Display System";
     string currentFilter = ViewBag.CurrentStatusFilter ?? "Active";
+
+    // UI-only derived counts (grouped from the same Model already provided by the controller —
+    // no new data source, no change to how orders are queried/prioritized).
+    int quickCount = Model.Count(o => o.OrderType == QServe.Models.OrderTypes.Quick);
+    int regularCount = Model.Count(o => o.OrderType == QServe.Models.OrderTypes.Regular);
+    int heavyCount = Model.Count(o => o.OrderType == QServe.Models.OrderTypes.Heavy);
 }
 
-<nav class="topbar">
-    <span class="topbar__brand" style="display:flex; align-items:center; gap:8px;">
-        <img src="~/images/logo.png" alt="QServe" class="brand-logo" width="24" height="24" />
-        QServe — Kitchen Display
+<nav class="topbar" id="kdsTopbar">
+    <span class="topbar__brand">
+        <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "130" }, { "LogoHeight", "44" }, { "LogoClass", "brand-logo" } }' />
     </span>
-    <div style="display:flex; gap:6px; margin-left:16px;">
-        <a href="@Url.Action("Index", new { status = "Active" })"
-           class="topbar__link @(currentFilter is "Active" or "" ? "active" : "")">
-            All Active (@ViewBag.ActiveCount)
-        </a>
-        <a href="@Url.Action("Index", new { status = "Approved" })"
-           class="topbar__link @(currentFilter == "Approved" ? "active" : "")">
-            New (@ViewBag.ApprovedCount)
-        </a>
-        <a href="@Url.Action("Index", new { status = "Preparing" })"
-           class="topbar__link @(currentFilter == "Preparing" ? "active" : "")">
-            Preparing (@ViewBag.PreparingCount)
-        </a>
-        <a href="@Url.Action("Index", new { status = "Ready" })"
-           class="topbar__link @(currentFilter == "Ready" ? "active" : "")">
-            Ready (@ViewBag.ReadyCount)
-        </a>
-        <a href="@Url.Action("Index", new { status = "Served" })"
-           class="topbar__link @(currentFilter == "Served" ? "active" : "")">
-            Served Today (@ViewBag.ServedTodayCount)
-        </a>
+
+    <span class="topbar__live">
+        <span class="topbar__live-dot"></span>
+        Live
+        <span class="topbar__clock" id="kdsClock"></span>
+    </span>
+
+    <div class="topbar__summary">
+        <span class="topbar__active-count">@Model.Count Active Order@(Model.Count == 1 ? "" : "s")</span>
+        <div class="topbar__type-counts">
+            <span class="kds-count-pill tier-quick">@quickCount Quick</span>
+            <span class="kds-count-pill tier-regular">@regularCount Regular</span>
+            <span class="kds-count-pill tier-heavy">@heavyCount Heavy</span>
+        </div>
     </div>
-    <span class="topbar__spacer"></span>
-    @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
-    {
-        <a asp-controller="Admin" asp-action="Index" class="topbar__link" style="margin-right:12px;">Admin Dashboard →</a>
-    }
-    <form asp-controller="Account" asp-action="Logout" method="post" style="display:inline;">
-        @Html.AntiForgeryToken()
-        <button type="submit" class="topbar__logout">Log out</button>
-    </form>
+
+    <div class="topbar__icons">
+        
+        <div class="topbar__user-menu">
+            <button type="button" class="topbar__icon-btn" id="kdsUserMenuBtn" title="Account" aria-label="Account menu" aria-haspopup="true" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            </button>
+            <div class="topbar__user-dropdown" id="kdsUserDropdown">
+                @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                {
+                    <a asp-controller="Admin" asp-action="Index">Admin Dashboard</a>
+                }
+                <form asp-controller="Account" asp-action="Logout" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit">Log out</button>
+                </form>
+            </div>
+        </div>
+    </div>
 </nav>
 
-<div class="page" style="max-width:1200px;">
-    <div class="page-head">
-        <div>
-            <span class="eyebrow">Live Kitchen Queue</span>
-            <h1>Kitchen Display</h1>
-        </div>
-        <div style="display:flex; gap:8px; align-items:center;">
-            <span class="badge tier-quick" style="padding:4px 10px;">Quick (&le;10m)</span>
-            <span class="badge tier-regular" style="padding:4px 10px;">Regular</span>
-            <span class="badge tier-heavy" style="padding:4px 10px;">Heavy (&gt;25m)</span>
-        </div>
-    </div>
+<div class="kds-filter-bar" id="kdsFilterBar">
+    <a href="@Url.Action("Index", new { status = "Active" })"
+       class="topbar__link @(currentFilter is "Active" or "" ? "active" : "")">
+        All Active (@ViewBag.ActiveCount)
+    </a>
+    <a href="@Url.Action("Index", new { status = "Approved" })"
+       class="topbar__link @(currentFilter == "Approved" ? "active" : "")">
+        New (@ViewBag.ApprovedCount)
+    </a>
+    <a href="@Url.Action("Index", new { status = "Preparing" })"
+       class="topbar__link @(currentFilter == "Preparing" ? "active" : "")">
+        Preparing (@ViewBag.PreparingCount)
+    </a>
+    <a href="@Url.Action("Index", new { status = "Ready" })"
+       class="topbar__link @(currentFilter == "Ready" ? "active" : "")">
+        Ready (@ViewBag.ReadyCount)
+    </a>
+    <a href="@Url.Action("Index", new { status = "Served" })"
+       class="topbar__link @(currentFilter == "Served" ? "active" : "")">
+        Served Today (@ViewBag.ServedTodayCount)
+    </a>
+</div>
+
+<div class="page" style="max-width:1280px;">
 
     @if (TempData["KdsError"] is string errorMsg)
     {
@@ -63,98 +86,198 @@
     }
 
     <div class="kds-grid">
-    @foreach (var order in Model)
-    {
-        var elapsedMinutes = (int)(DateTime.UtcNow - order.CreatedAt).TotalMinutes;
-        var ageText = elapsedMinutes < 1 ? "Just now" : $"{elapsedMinutes}m ago";
+        @foreach (var order in Model)
+        {
+            var elapsed = DateTime.UtcNow - order.CreatedAt;
+            var elapsedMinutes = (int)elapsed.TotalMinutes;
+            var timerText = elapsed.TotalHours >= 1
+                ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:D2}:{elapsed.Seconds:D2}"
+                : $"{elapsedMinutes:D2}:{elapsed.Seconds:D2}";
 
-        <div class="kds-card tier-@order.OrderType.ToLower()" data-order-id="@order.OrderID">
-            <div class="kds-card__head">
-                <div style="display:flex; flex-direction:column;">
-                    <span style="font-weight:800; font-size:16px;">Table @(order.Table?.TableNumber ?? "-")</span>
-                    <span class="mono text-muted" style="font-size:11px;">#@order.OrderID.ToString("D5") &middot; @ageText</span>
+            var tierClass = order.OrderType == "Quick" ? "tier-quick" : order.OrderType == "Heavy" ? "tier-heavy" : "tier-regular";
+
+            <div class="kds-card @tierClass" data-order-id="@order.OrderID">
+                <div class="kds-card__head">
+                    <div>
+                        <div class="kds-table-title">@(order.Table?.TableNumber ?? "-")</div>
+                    </div>
+                    <span class="badge @tierClass">
+                        @order.OrderType
+                    </span>
                 </div>
-                <span class="badge @(order.OrderType == "Quick" ? "badge-curry" : order.OrderType == "Heavy" ? "badge-tamarind" : "badge-turmeric")">
-                    @order.OrderType
-                </span>
-            </div>
 
-            @if (!string.IsNullOrWhiteSpace(order.Notes))
-            {
-                <div style="background:var(--turmeric-tint); border-radius:4px; padding:4px 8px; font-size:12px; margin-bottom:8px; color:var(--ink);">
-                    <strong>Note:</strong> @order.Notes
-                </div>
-            }
+    <div class="kds-meta-row">
+        <span class="kds-order-id">#@order.OrderID.ToString("D5")</span>
 
-            <ul>
-                @foreach (var line in order.OrderItems)
+        <span class="kds-timer"
+              data-created-at="@order.CreatedAt.ToUniversalTime().ToString("O")">
+            @timerText
+        </span>
+    </div>
+
+                @if (!string.IsNullOrWhiteSpace(order.Notes))
                 {
-                    <li>
-                        <strong>@line.Quantity &times;</strong> @(line.Item?.Name ?? "Item #" + line.ItemID)
-                        @if (!string.IsNullOrWhiteSpace(line.Customization))
-                        {
-                            <div class="custom-note">@line.Customization</div>
-                        }
-                    </li>
+                    <div class="kds-note-banner">
+                        <strong>Note:</strong> @order.Notes
+                    </div>
                 }
-            </ul>
 
-            <div class="kds-card__foot">
-                <div>
-                    @{
-                        string statusBadge = order.OrderStatus switch {
-                            "Approved" => "badge-steel",
-                            "Preparing" => "badge-turmeric",
-                            "Ready" => "badge-curry",
-                            "Served" => "badge-steel",
-                            _ => "badge-steel"
-                        };
+                <ul>
+                    @foreach (var line in order.OrderItems)
+                    {
+                        <li>
+                            <span class="kds-qty">@line.Quantity &times;</span>
+                            <span class="kds-item-name">@(line.Item?.Name ?? "Item #" + line.ItemID)</span>
+                            @if (!string.IsNullOrWhiteSpace(line.Customization))
+                            {
+                                <div>
+                                    <span class="custom-note">@line.Customization</span>
+                                </div>
+                            }
+                        </li>
                     }
-                    <span class="badge @statusBadge" style="font-size:10px;">@order.OrderStatus</span>
-                </div>
+                </ul>
 
-                <div>
-                    @if (order.OrderStatus == "Approved")
-                    {
-                        <form asp-action="MarkPreparing" asp-route-orderId="@order.OrderID" method="post" style="display:inline;">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-primary btn-sm">Start Preparing</button>
-                        </form>
-                    }
-                    else if (order.OrderStatus == "Preparing")
-                    {
-                        <form asp-action="MarkReady" asp-route-orderId="@order.OrderID" method="post" style="display:inline;">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-primary btn-sm">Mark Ready</button>
-                        </form>
-                    }
-                    else if (order.OrderStatus == "Ready")
-                    {
-                        <form asp-action="MarkServed" asp-route-orderId="@order.OrderID" method="post" style="display:inline;">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-outline btn-sm">Mark Served</button>
-                        </form>
-                    }
-                    else if (order.OrderStatus == "Served")
-                    {
-                        <span class="mono text-muted" style="font-size:11px;">Completed</span>
-                    }
+                <div class="kds-card__foot">
+                    <div class="kds-card__status-row">
+                        @{
+                            string statusBadge = order.OrderStatus switch
+                            {
+                                "Approved" => "badge-approved",
+                                "Preparing" => "badge-preparing",
+                                "Ready" => "badge-ready",
+                                "Served" => "badge-served",
+                                _ => "badge-neutral"
+                            };
+                        }
+                        <span class="badge @statusBadge">@order.OrderStatus</span>
+                        @if (order.OrderStatus == "Served")
+                        {
+                            <span class="mono text-muted" style="font-size:12px;">Completed</span>
+                        }
+                    </div>
+
+                    <div class="kds-card__actions">
+                        @if (order.OrderStatus == "Approved")
+                        {
+                            <form asp-action="MarkPreparing" asp-route-orderId="@order.OrderID" method="post" style="display:flex; flex:1;">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="kds-btn kds-btn-primary">
+                                    Start Preparing
+                                </button>
+                            </form>
+                        }
+                        else if (order.OrderStatus == "Preparing")
+                        {
+                            <form asp-action="MarkReady" asp-route-orderId="@order.OrderID" method="post" style="display:flex; flex:1;">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="kds-btn kds-btn-primary">
+                                    Mark Ready
+                                </button>
+                            </form>
+                        }
+                        else if (order.OrderStatus == "Ready")
+                        {
+                            <form asp-action="MarkServed" asp-route-orderId="@order.OrderID" method="post" style="display:flex; flex:1;">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="kds-btn kds-btn-primary">
+                                    Complete Order
+                                </button>
+                            </form>
+                        }
+                    </div>
                 </div>
             </div>
-        </div>
-    }
+        }
     </div>
 
     @if (!Model.Any())
     {
-        <div class="card mt-lg" style="text-align:center; padding:40px 20px;">
-            <p class="kds-empty" style="margin:0;">No orders in this queue right now.</p>
+        <div class="card mt-lg" style="text-align:center; padding:48px 20px;">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 14 14"></polyline>
+            </svg>
+            <p class="empty-state-text">No active kitchen orders in this queue right now.</p>
         </div>
     }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
 <script>
+    // --- UI-only: live clock in the header pill. Purely cosmetic, no server calls. ---
+    function tickKdsClock() {
+        const el = document.getElementById('kdsClock');
+        if (!el) return;
+
+        const indiaTime = new Intl.DateTimeFormat('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        }).format(new Date());
+
+        el.textContent = indiaTime;
+    }
+
+    tickKdsClock();
+    setInterval(tickKdsClock, 1000);
+
+    // --- UI-only: toggle the account dropdown. Reuses the existing Admin link / Logout
+    // form that were already on this page — no new endpoints or behavior added. ---
+    const kdsUserMenuBtn = document.getElementById('kdsUserMenuBtn');
+    const kdsUserDropdown = document.getElementById('kdsUserDropdown');
+    if (kdsUserMenuBtn && kdsUserDropdown) {
+        kdsUserMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = kdsUserDropdown.classList.toggle('is-open');
+            kdsUserMenuBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+        document.addEventListener('click', () => kdsUserDropdown.classList.remove('is-open'));
+    }
+
+    // --- Notification bell: reflects the EXISTING "PaymentPendingVerification" SignalR
+    // event (already broadcast by IRealtimeNotifier — no server change). The page reloads
+    // ~1s after that event fires (existing scheduleReload() below), so the "unseen" flag is
+    // kept in sessionStorage to survive the reload; it clears when the bell is clicked. ---
+    const kdsNotifBtn = document.getElementById('kdsNotifBtn');
+    const kdsNotifBadge = document.getElementById('kdsNotifBadge');
+    const KDS_NOTIF_KEY = 'kdsHasPendingNotification';
+
+    function showKdsNotifBadge() {
+        sessionStorage.setItem(KDS_NOTIF_KEY, 'true');
+        if (kdsNotifBadge) kdsNotifBadge.hidden = false;
+    }
+    function clearKdsNotifBadge() {
+        sessionStorage.removeItem(KDS_NOTIF_KEY);
+        if (kdsNotifBadge) kdsNotifBadge.hidden = true;
+    }
+    if (sessionStorage.getItem(KDS_NOTIF_KEY) === 'true') {
+        showKdsNotifBadge();
+    }
+    if (kdsNotifBtn) {
+        kdsNotifBtn.addEventListener('click', clearKdsNotifBadge);
+    }
+
+    // --- UI-only: keep the filter bar pinned exactly under the header, even when the
+    // header wraps onto multiple lines on narrow screens. Measures the real header height
+    // and writes it to a CSS variable instead of a hardcoded px value. ---
+    const kdsTopbar = document.getElementById('kdsTopbar');
+    function updateKdsHeaderHeight() {
+        if (kdsTopbar) {
+            document.documentElement.style.setProperty('--kds-header-height', kdsTopbar.offsetHeight + 'px');
+        }
+    }
+    updateKdsHeaderHeight();
+    window.addEventListener('resize', updateKdsHeaderHeight);
+    window.addEventListener('load', updateKdsHeaderHeight);
+    if (window.ResizeObserver && kdsTopbar) {
+        new ResizeObserver(updateKdsHeaderHeight).observe(kdsTopbar);
+    }
+
+    // --- Existing KDS real-time logic — event names, hub URL, and reload behavior
+    // UNCHANGED. Only addition: showKdsNotifBadge() call on PaymentPendingVerification. ---
     let reloadTimer = null;
     function scheduleReload() {
         if (reloadTimer) clearTimeout(reloadTimer);
@@ -167,6 +290,9 @@
         .build();
 
     connection.on("OrderStatusUpdate", () => scheduleReload());
-    connection.on("PaymentPendingVerification", () => scheduleReload());
+    connection.on("PaymentPendingVerification", () => {
+        showKdsNotifBadge();
+        scheduleReload();
+    });
     connection.start().catch(err => console.error("SignalR connection failed:", err));
 </script>

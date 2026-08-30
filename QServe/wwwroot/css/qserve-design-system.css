@@ -1,0 +1,234 @@
+/* =========================================================================
+   QSERVE DESIGN SYSTEM — CORE TOKENS & FOUNDATIONS
+   Reference: QServe Hospitality SaaS Design System (Tailwind M3 Tokens)
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+
+:root {
+    /* ---- Exact Palette Tokens from Reference ---- */
+    --background: #f9f9f8;
+    --on-background: #1a1c1c;
+    /* Surfaces */
+    --surface: #f9f9f8;
+    --surface-bright: #f9f9f8;
+    --surface-dim: #dadad9;
+    --surface-variant: #e2e2e2;
+    --surface-container-lowest: #ffffff;
+    --surface-container-low: #f3f4f3;
+    --surface-container: #eeeeed;
+    --surface-container-high: #e8e8e7;
+    --surface-container-highest: #e2e2e2;
+    /* Inverses */
+    --inverse-surface: #2f3130;
+    --inverse-on-surface: #f1f1f0;
+    --inverse-primary: #ffb95f;
+    /* Text & On-Surfaces */
+    --on-surface: #1a1c1c;
+    --on-surface-variant: #534434;
+    --secondary: #625d5b;
+    --on-secondary: #ffffff;
+    --secondary-container: #e9e1dd;
+    --on-secondary-container: #686361;
+    --secondary-fixed: #e9e1dd;
+    --secondary-fixed-dim: #ccc5c2;
+    --on-secondary-fixed: #1e1b19;
+    --on-secondary-fixed-variant: #4a4643;
+    /* Outlines & Borders */
+    --outline: #867461;
+    --outline-variant: #d8c3ad;
+    --outline-subtle: #d8c3ad;
+    /* Primary Brand (Deep Brown #855300 & Warm Orange #f59e0b) */
+    --primary: #855300;
+    --on-primary: #ffffff;
+    --primary-container: #f59e0b;
+    --on-primary-container: #613b00;
+    --primary-fixed: #ffddb8;
+    --primary-fixed-dim: #ffb95f;
+    --on-primary-fixed: #2a1700;
+    --on-primary-fixed-variant: #653e00;
+    --primary-hover: #d97706;
+    --primary-focus-glow: rgba(245, 158, 11, 0.25);
+    --surface-tint: #855300;
+    /* Tertiary */
+    --tertiary: #944a23;
+    --on-tertiary: #ffffff;
+    --tertiary-container: #f79a6c;
+    --on-tertiary-container: #72300a;
+    --tertiary-fixed: #ffdbcc;
+    --tertiary-fixed-dim: #ffb693;
+    --on-tertiary-fixed: #351000;
+    --on-tertiary-fixed-variant: #76330d;
+    /* Error / Semantic */
+    --error: #ba1a1a;
+    --on-error: #ffffff;
+    --error-container: #ffdad6;
+    --on-error-container: #93000a;
+    /* Status Tokens */
+    --status-new-bg: #eff6ff;
+    --status-new-text: #1e40af;
+    --status-new-border: #bfdbfe;
+    --status-preparing-bg: #fffbeb;
+    --status-preparing-text: #92400e;
+    --status-preparing-border: #fde68a;
+    --status-ready-bg: #f0fdf4;
+    --status-ready-text: #166534;
+    --status-ready-border: #bbf7d0;
+    --status-served-bg: #eeeeed;
+    --status-served-text: #1a1c1c;
+    --status-served-border: #d8c3ad;
+    --status-pending-bg: #fff7ed;
+    --status-pending-text: #9a3412;
+    --status-pending-border: #fed7aa;
+    --status-cancelled-bg: #ffdad6;
+    --status-cancelled-text: #93000a;
+    --status-cancelled-border: #fca5a5;
+    --status-approved-bg: #eff6ff;
+    --status-approved-text: #1e40af;
+    --status-approved-border: #bfdbfe;
+    --status-awaiting-bg: #fffbeb;
+    --status-awaiting-text: #92400e;
+    /* Order Priority Tier Tokens — per DESIGN.md "Green-Blue-Purple-Deep Orange" progression.
+     Quick = Green, Regular = Blue, Heavy = Deep Orange. Purple reserved for a future 4th tier. */
+    --tier-quick-bg: var(--status-ready-bg); /* Green  #f0fdf4 */
+    --tier-quick-text: var(--status-ready-text); /* #166534 */
+
+    --tier-regular-bg: var(--status-new-bg); /* Blue   #eff6ff */
+    --tier-regular-text: var(--status-new-text); /* #1e40af */
+
+    --tier-heavy-bg: var(--tertiary-container); /* Deep Orange #f79a6c */
+    --tier-heavy-text: var(--on-tertiary-container); /* #72300a */
+
+
+    --status-awaiting-bg: #fffbeb;
+    --status-awaiting-text: #92400e;
+    --status-awaiting-border: #fde68a;
+    /* ---- Spacing Tokens ---- */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-2xl: 48px;
+    --space-3xl: 64px;
+    /* Spacing Aliases */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --gutter-desktop: 24px;
+    --margin-mobile: 16px;
+    --container-max: 1280px;
+    /* ---- Border Radius Tokens ---- */
+    --radius-sm: 4px;
+    --radius-default: 6px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 24px; /* rounded-2xl per DESIGN.md — product cards, order tickets, dashboard widgets */
+    --radius-full: 9999px;
+    --radius-pill: 9999px;
+    /* ---- Typography Scale ---- */
+    --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-display-lg: 700 48px/56px var(--font-family);
+    --font-display-md: 700 36px/44px var(--font-family);
+    --font-headline-lg: 600 30px/38px var(--font-family);
+    --font-headline-lg-mobile: 600 24px/32px var(--font-family);
+    --font-headline-md: 600 20px/28px var(--font-family);
+    --font-body-lg: 400 18px/28px var(--font-family);
+    --font-body-md: 400 16px/24px var(--font-family);
+    --font-body-sm: 400 14px/20px var(--font-family);
+    --font-mono-label: 500 13px/16px var(--font-mono);
+    --font-label-md: 600 12px/16px var(--font-family);
+    /* ---- Subtle Shadows ---- */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+    --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+    --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+    --shadow-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --shadow-elevated: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+    /* Color Aliases */
+    --on-surface-muted: #79747e;
+    --primary-tint-subtle: rgba(245, 158, 11, 0.08);
+    /* Transitions */
+    --transition-fast: 150ms ease;
+    --transition-normal: 200ms ease;
+}
+
+/* Base Body Styles */
+body {
+  font-family: var(--font-family);
+  background-color: var(--background);
+  color: var(--on-surface);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Material Symbols Integration */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.material-symbols-outlined.filled-icon {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--on-surface);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.headline-lg {
+  font: var(--font-headline-lg);
+  color: var(--on-surface);
+}
+
+.headline-md {
+  font: var(--font-headline-md);
+  color: var(--on-surface);
+}
+
+.display-md {
+  font: var(--font-display-md);
+  color: var(--on-surface);
+}
+
+.body-md {
+  font: var(--font-body-md);
+  color: var(--on-surface-variant);
+}
+
+.body-sm {
+  font: var(--font-body-sm);
+  color: var(--on-surface);
+}
+
+.text-muted {
+  color: var(--on-surface-variant);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}

@@ -15,8 +15,8 @@ public static class OrderStatusStateMachine
 
         return currentStatus switch
         {
-            OrderStatuses.PendingPayment => nextStatus is OrderStatuses.Approved or OrderStatuses.Cancelled,
-            OrderStatuses.AwaitingVerification => nextStatus is OrderStatuses.Approved or OrderStatuses.Cancelled,
+            OrderStatuses.PendingPayment => nextStatus is OrderStatuses.Approved or OrderStatuses.Cancelled or OrderStatuses.AwaitingVerification or OrderStatuses.PendingPayment,
+            OrderStatuses.AwaitingVerification => nextStatus is OrderStatuses.Approved or OrderStatuses.Cancelled or OrderStatuses.PendingPayment or OrderStatuses.AwaitingVerification,
             OrderStatuses.Approved => nextStatus is OrderStatuses.Preparing or OrderStatuses.Cancelled,
             OrderStatuses.Preparing => nextStatus is OrderStatuses.Ready or OrderStatuses.Cancelled,
             OrderStatuses.Ready => nextStatus is OrderStatuses.Served or OrderStatuses.Cancelled,
@@ -24,5 +24,13 @@ public static class OrderStatusStateMachine
             OrderStatuses.Cancelled => false, // Terminal state — cannot leave Cancelled
             _ => false
         };
+    }
+
+    /// <summary>
+    /// Checks if the order is in a pre-kitchen state where the customer can cancel the order.
+    /// </summary>
+    public static bool CanCustomerCancel(string currentStatus)
+    {
+        return currentStatus is OrderStatuses.PendingPayment or OrderStatuses.AwaitingVerification;
     }
 }

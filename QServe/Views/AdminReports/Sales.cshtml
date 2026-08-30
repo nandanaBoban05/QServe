@@ -1,45 +1,176 @@
 @model QServe.ViewModels.DailySalesSummaryDto
 @{
-    ViewData["Title"] = "Daily Sales Summary";
+    ViewData["Title"] = "Sales Analytics & Trend";
+    var trend = (List<QServe.ViewModels.DailyTrendPoint>)(ViewBag.Trend ?? new List<QServe.ViewModels.DailyTrendPoint>());
 }
 
 <partial name="_AdminNav" />
 
 <div class="page">
-    <span class="eyebrow">Reports</span>
-    <h1>Daily Sales Summary</h1>
+    <div class="page-head">
+        <div>
+            <span class="eyebrow">Financial Analytics</span>
+            <h1 class="headline-lg">Sales Analytics &amp; Revenue Trends</h1>
+        </div>
+    </div>
+
     <partial name="_ReportsNav" />
     <partial name="_DateRangeFilter" />
 
+    <!-- Stat Metric Cards -->
     <div class="stat-grid">
         <div class="stat-card">
-            <div class="stat-value">₹@Model.Revenue.ToString("0.00")</div>
-            <div class="stat-label">Revenue</div>
+            <div>
+                <div class="stat-label">Total Period Revenue</div>
+                <div class="stat-value mt-sm" style="color:var(--primary);">₹@Model.Revenue.ToString("0.00")</div>
+            </div>
+            <div class="text-muted" style="font-size:12px; margin-top:6px;">Calculated from settled orders in range</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value">@Model.OrderCount</div>
-            <div class="stat-label">Orders</div>
+            <div>
+                <div class="stat-label">Total Orders Placed</div>
+                <div class="stat-value mt-sm">@Model.OrderCount</div>
+            </div>
+            <div class="text-muted" style="font-size:12px; margin-top:6px;">Completed within selected date range</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value">₹@Model.AvgOrderValue.ToString("0.00")</div>
-            <div class="stat-label">Avg Order Value</div>
+            <div>
+                <div class="stat-label">Average Order Value (AOV)</div>
+                <div class="stat-value mt-sm" style="color:var(--status-ready-text);">₹@Model.AvgOrderValue.ToString("0.00")</div>
+            </div>
+            <div class="text-muted" style="font-size:12px; margin-top:6px;">Per completed transaction</div>
         </div>
     </div>
 
+    <!-- Historical Sales & Orders Trend Chart -->
     <div class="card mt-lg">
-        <h3 style="margin-bottom:12px;">Revenue by payment mode</h3>
-        @if (!Model.RevenueByPaymentMode.Any())
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div>
+                <h3 style="margin:0; font-size:17px; font-weight:700;">Sales &amp; Orders Trend</h3>
+                <span class="text-muted" style="font-size:12.5px;">Revenue (₹) and volume breakdown over time</span>
+            </div>
+        </div>
+
+        @if (!trend.Any(t => t.OrderCount > 0 || t.Revenue > 0))
         {
-            <p class="kds-empty">No orders in this range.</p>
+            <div class="empty-state" style="padding:24px 0;">
+                <p class="empty-state-text">No order activity recorded in this selected timeframe.</p>
+            </div>
         }
         else
         {
-            <table class="data-table" style="max-width:360px;">
-                @foreach (var (mode, amount) in Model.RevenueByPaymentMode)
-                {
-                    <tr><td>@mode</td><td class="num">₹@amount.ToString("0.00")</td></tr>
-                }
-            </table>
+            <div style="height:280px; position:relative;">
+                <canvas id="salesTrendChart"></canvas>
+            </div>
+        }
+    </div>
+
+    <!-- Revenue Breakdown by Payment Mode -->
+    <div class="card mt-lg">
+        <h3 style="margin-bottom:16px; font-size:17px; font-weight:700;">Revenue Breakdown by Payment Mode</h3>
+        @if (!Model.RevenueByPaymentMode.Any())
+        {
+            <div class="empty-state" style="padding:24px 0;">
+                <p class="empty-state-text">No order sales found in this selected date range.</p>
+            </div>
+        }
+        else
+        {
+            <div class="data-table-container" style="max-width:520px;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Payment Mode</th>
+                            <th style="text-align:right;">Total Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var (mode, amount) in Model.RevenueByPaymentMode)
+                    {
+                        <tr>
+                            <td><strong style="color:var(--on-surface);">@mode</strong></td>
+                            <td class="num" style="text-align:right; font-weight:700; color:var(--primary); font-size:15px;">
+                                ₹@amount.ToString("0.00")
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
         }
     </div>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script>
+    @if (trend.Any())
+    {
+        <text>
+        const ctx = document.getElementById('salesTrendChart');
+        if (ctx) {
+            const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(trend.Select(t => t.Date.ToString("MMM d"))));
+            const revenueData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(trend.Select(t => t.Revenue)));
+            const orderData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(trend.Select(t => t.OrderCount)));
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Revenue (₹)',
+                            data: revenueData,
+                            backgroundColor: 'rgba(245, 158, 11, 0.75)',
+                            borderColor: '#855300',
+                            borderWidth: 1.5,
+                            borderRadius: 6,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Order Count',
+                            data: orderData,
+                            type: 'line',
+                            borderColor: '#0284c7',
+                            backgroundColor: 'rgba(2, 132, 199, 0.1)',
+                            borderWidth: 2.5,
+                            pointBackgroundColor: '#0284c7',
+                            pointRadius: 4,
+                            tension: 0.3,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Revenue (₹)' },
+                            grid: { color: 'rgba(0,0,0,0.04)' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: 'Orders' },
+                            grid: { drawOnChartArea: false }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { boxWidth: 14, font: { family: 'Inter', size: 12 } }
+                        }
+                    }
+                }
+            });
+        }
+        </text>
+    }
+</script>

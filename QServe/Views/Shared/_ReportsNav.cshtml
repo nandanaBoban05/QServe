@@ -1,8 +1,12 @@
-<nav style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;">
-    <a class="badge badge-steel" asp-controller="AdminReports" asp-action="Sales" style="text-decoration:none; padding:5px 12px;">Daily Sales</a>
-    <a class="badge badge-steel" asp-controller="AdminReports" asp-action="PopularItems" style="text-decoration:none; padding:5px 12px;">Popular Items</a>
-    <a class="badge badge-steel" asp-controller="AdminReports" asp-action="Throughput" style="text-decoration:none; padding:5px 12px;">Kitchen Throughput</a>
-    <a class="badge badge-steel" asp-controller="AdminReports" asp-action="PaymentLog" style="text-decoration:none; padding:5px 12px;">Payment Log</a>
-    <a class="badge badge-steel" asp-controller="AdminReports" asp-action="OrderStatus" style="text-decoration:none; padding:5px 12px;">Order Status</a>
-    <a class="badge badge-steel" asp-controller="AdminReports" asp-action="TableUtilisation" style="text-decoration:none; padding:5px 12px;">Table Utilisation</a>
+@{
+    string currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+}
+
+<nav class="reports-nav">
+    <a class="@(string.Equals(currentAction, "Sales", StringComparison.OrdinalIgnoreCase) ? "active" : "")" asp-controller="AdminReports" asp-action="Sales">Daily Sales</a>
+    <a class="@(string.Equals(currentAction, "PopularItems", StringComparison.OrdinalIgnoreCase) ? "active" : "")" asp-controller="AdminReports" asp-action="PopularItems">Popular Items</a>
+    <a class="@(string.Equals(currentAction, "Throughput", StringComparison.OrdinalIgnoreCase) ? "active" : "")" asp-controller="AdminReports" asp-action="Throughput">Kitchen Throughput</a>
+    <a class="@(string.Equals(currentAction, "PaymentLog", StringComparison.OrdinalIgnoreCase) ? "active" : "")" asp-controller="AdminReports" asp-action="PaymentLog">Payment Log</a>
+    <a class="@(string.Equals(currentAction, "OrderStatus", StringComparison.OrdinalIgnoreCase) ? "active" : "")" asp-controller="AdminReports" asp-action="OrderStatus">Order Status Breakdown</a>
+    <a class="@(string.Equals(currentAction, "TableUtilisation", StringComparison.OrdinalIgnoreCase) ? "active" : "")" asp-controller="AdminReports" asp-action="TableUtilisation">Table Utilisation</a>
 </nav>

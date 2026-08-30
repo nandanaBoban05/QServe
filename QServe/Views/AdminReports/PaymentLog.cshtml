@@ -1,4 +1,4 @@
-@model List<QServe.ViewModels.PaymentVerificationLogEntryDto>
+@model QServe.ViewModels.PagedResult<QServe.ViewModels.PaymentVerificationLogEntryDto>
 @{
     ViewData["Title"] = "Payment Verification Log";
 }
@@ -6,34 +6,65 @@
 <partial name="_AdminNav" />
 
 <div class="page">
-    <span class="eyebrow">Reports</span>
-    <h1>Payment Verification Log</h1>
+    <div class="page-head">
+        <div>
+            <span class="eyebrow">Financial Audit</span>
+            <h1 class="headline-lg">Payment Verification Log</h1>
+        </div>
+        <div class="mono text-muted" style="font-size:13.5px;">
+            Total: <strong style="color:var(--on-surface);">@Model.TotalCount</strong> entries
+        </div>
+    </div>
+
     <partial name="_ReportsNav" />
     <partial name="_DateRangeFilter" />
 
-    <div class="card">
-    @if (!Model.Any())
+    <div class="card" style="padding:0; overflow:hidden;">
+    @if (!Model.Items.Any())
     {
-        <p class="kds-empty">No offline payment decisions in this range.</p>
+        <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+            </svg>
+            <p class="empty-state-text">No offline payment verification decisions in this date range.</p>
+        </div>
     }
     else
     {
-        <table class="data-table">
-            <thead><tr><th>Table</th><th>Mode</th><th>Amount</th><th>Decision</th><th>By</th><th>When</th></tr></thead>
-            <tbody>
-            @foreach (var entry in Model)
-            {
-                <tr>
-                    <td>@entry.TableNumber</td>
-                    <td><span class="badge badge-steel">@entry.PaymentMode</span></td>
-                    <td class="num">₹@entry.Amount.ToString("0.00")</td>
-                    <td><span class="badge @(entry.Approved ? "badge-curry" : "badge-tamarind")">@(entry.Approved ? "Approved" : "Rejected")</span></td>
-                    <td>@entry.VerifiedByName</td>
-                    <td class="num">@entry.VerificationTime?.ToString("MMM d, HH:mm")</td>
-                </tr>
-            }
-            </tbody>
-        </table>
+        <div class="data-table-container" style="border:none; border-radius:0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Table</th>
+                        <th>Payment Mode</th>
+                        <th>Amount</th>
+                        <th>Decision</th>
+                        <th>Verified By</th>
+                        <th style="text-align:right;">When (UTC)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var entry in Model.Items)
+                {
+                    <tr>
+                        <td><strong>Table @entry.TableNumber</strong></td>
+                        <td><span class="badge badge-neutral">@entry.PaymentMode</span></td>
+                        <td class="num" style="font-weight:700; color:var(--on-surface);">₹@entry.Amount.ToString("0.00")</td>
+                        <td>
+                            <span class="badge @(entry.Approved ? "badge-ready" : "badge-cancelled")">
+                                @(entry.Approved ? "Approved" : "Rejected")
+                            </span>
+                        </td>
+                        <td>@(entry.VerifiedByName ?? "Staff")</td>
+                        <td class="num text-muted" style="text-align:right;">@entry.VerificationTime?.ToString("MMM d, HH:mm")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <partial name="_Pagination" model="Model" />
     }
     </div>
 </div>

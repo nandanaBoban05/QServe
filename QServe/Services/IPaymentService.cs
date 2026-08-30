@@ -1,3 +1,5 @@
+using QServe.Models;
+
 namespace QServe.Services;
 
 public record RazorpayCheckoutInfo(string RazorpayOrderId, string KeyId, long AmountInPaise, string Currency, int OrderId);
@@ -25,7 +27,13 @@ public interface IPaymentService
     Task MarkOnlinePaymentFailedAsync(int orderId);
 
     /// <summary>PAY-6/PAY-7/PAY-8: Admin approves or rejects a pending Cash/Card payment.</summary>
-    Task AdminVerifyAsync(int paymentId, bool approve, int adminUserId);
+    Task AdminVerifyAsync(int paymentId, bool approve, int adminUserId, string? rejectionReason = null);
+
+    /// <summary>
+    /// Repayment: Creates a new payment attempt for an existing order after rejection/failure,
+    /// recalculating prices server-side and preserving previous payment attempts in history.
+    /// </summary>
+    Task<Payment> InitiateRepaymentAsync(int orderId, string paymentMode);
 
     /// <summary>
     /// Gap fix (was flagged in GAP-ANALYSIS.md): a true server-to-server Razorpay webhook,

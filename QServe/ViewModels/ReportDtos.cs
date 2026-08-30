@@ -59,3 +59,12 @@ public class TableUtilisationDto
     public int OrderCount { get; set; }
     public decimal Revenue { get; set; }
 }
+
+/// <summary>REP-7: one cell of the "busiest tables by hour" breakdown — how many orders a
+/// given table placed during a given hour-of-day, across the whole selected date range.</summary>
+public class TableHourBucketDto
+{
+    public string TableNumber { get; set; } = string.Empty;
+    public int Hour { get; set; }
+    public int OrderCount { get; set; }
+}

@@ -48,7 +48,7 @@ public class AdminStaffController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 20;
+        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
         var page = filter.Page > 0 ? filter.Page : 1;
 
         var users = await query

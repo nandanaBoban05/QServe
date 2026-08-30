@@ -1,32 +1,113 @@
 @model List<QServe.ViewModels.TableUtilisationDto>
 @{
     ViewData["Title"] = "Table Utilisation Report";
+    var byHour = (List<QServe.ViewModels.TableHourBucketDto>)(ViewBag.ByHour ?? new List<QServe.ViewModels.TableHourBucketDto>());
+    var hours = byHour.Select(b => b.Hour).Distinct().OrderBy(h => h).ToList();
+    var tableOrder = Model.Select(t => t.TableNumber).ToList(); // same rank order as the table above
+    var cellLookup = byHour.ToDictionary(b => (b.TableNumber, b.Hour), b => b.OrderCount);
+    var maxCount = byHour.Any() ? byHour.Max(b => b.OrderCount) : 0;
 }
 
 <partial name="_AdminNav" />
 
 <div class="page page--narrow">
-    <span class="eyebrow">Reports</span>
-    <h1>Table Utilisation</h1>
+    <div class="page-head">
+        <div>
+            <span class="eyebrow">Floor Insights</span>
+            <h1 class="headline-lg">Table Utilisation</h1>
+        </div>
+    </div>
+
     <partial name="_ReportsNav" />
     <partial name="_DateRangeFilter" />
 
     <div class="card">
-    @if (!Model.Any())
-    {
-        <p class="kds-empty">No orders in this range.</p>
-    }
-    else
-    {
-        <table class="data-table">
-            <thead><tr><th>Table</th><th>Orders</th><th>Revenue</th></tr></thead>
-            <tbody>
-            @foreach (var table in Model)
-            {
-                <tr><td>@table.TableNumber</td><td class="num">@table.OrderCount</td><td class="num">₹@table.Revenue.ToString("0.00")</td></tr>
-            }
-            </tbody>
-        </table>
-    }
+        @if (!Model.Any())
+        {
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                </svg>
+                <p class="empty-state-text">No table orders recorded in this date range.</p>
+            </div>
+        }
+        else
+        {
+            <div class="data-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Table</th>
+                            <th>Orders</th>
+                            <th style="text-align:right;">Total Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var table in Model)
+                        {
+                            <tr>
+                                <td><strong>Table @table.TableNumber</strong></td>
+                                <td class="num font-weight-bold">@table.OrderCount orders</td>
+                                <td class="num" style="text-align:right; font-weight:700; color:var(--primary); font-size:15px;">
+                                    ₹@table.Revenue.ToString("0.00")
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <!-- REP-7: busiest tables by hour -->
+    <div class="card mt-lg">
+        <h3 style="margin-bottom:6px;">Busiest Tables by Hour</h3>
+        <p class="text-muted" style="font-size:13px; margin-top:0; margin-bottom:16px;">
+            Order count per table, by hour of day (UTC). Darker cells mean more orders placed in that hour.
+        </p>
+
+        @if (!byHour.Any())
+        {
+            <div class="empty-state" style="padding:24px 0;">
+                <p class="empty-state-text">No table orders recorded in this date range.</p>
+            </div>
+        }
+        else
+        {
+            <div style="overflow-x:auto;">
+                <table class="data-table" style="min-width:600px;">
+                    <thead>
+                        <tr>
+                            <th style="position:sticky; left:0; background:var(--surface-container-low); z-index:1;">Table</th>
+                            @foreach (var hour in hours)
+                            {
+                                <th style="text-align:center; white-space:nowrap;">@hour.ToString("00"):00</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var tableNumber in tableOrder)
+                        {
+                            <tr>
+                                <td style="position:sticky; left:0; background:var(--surface-container-lowest); font-weight:700;">
+                                    Table @tableNumber
+                                </td>
+                                @foreach (var hour in hours)
+                                {
+                                    var count = cellLookup.TryGetValue((tableNumber, hour), out var c) ? c : 0;
+                                    var alpha = maxCount > 0 && count > 0 ? 0.12 + (0.78 * count / maxCount) : 0;
+                                    <td style="text-align:center; font-size:12.5px; font-weight:600;
+                                        background-color:rgba(245, 158, 11, @alpha.ToString("0.00"));
+                                        color:@(alpha > 0.45 ? "var(--on-primary-container)" : "var(--on-surface-variant)");">
+                                        @(count > 0 ? count.ToString() : "—")
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     </div>
 </div>

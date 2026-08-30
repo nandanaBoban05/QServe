@@ -23,17 +23,20 @@ public class CustomerController : Controller
     private readonly IQrCodeService _qrCodeService;
     private readonly IRealtimeNotifier _realtime;
     private readonly IRecommendationService _recommendationService;
+    private readonly IPaymentService? _paymentService;
 
     public CustomerController(
         ApplicationDbContext db,
         IQrCodeService qrCodeService,
         IRealtimeNotifier realtime,
-        IRecommendationService recommendationService)
+        IRecommendationService recommendationService,
+        IPaymentService? paymentService = null)
     {
         _db = db;
         _qrCodeService = qrCodeService;
         _realtime = realtime;
         _recommendationService = recommendationService;
+        _paymentService = paymentService;
     }
 
     // ---- Menu ----
@@ -62,9 +65,11 @@ public class CustomerController : Controller
             .Select(i => i.ItemID)
             .ToHashSet();
 
+        var cart = GetCart(tableId);
         ViewBag.TableId = tableId;
         ViewBag.TableNumber = table.TableNumber;
-        ViewBag.CartCount = GetCart(tableId).Sum(c => c.Quantity);
+        ViewBag.CartCount = cart.Sum(c => c.Quantity);
+        ViewBag.CartTotal = cart.Sum(c => c.LineTotal);
         ViewBag.PopularItemIds = popularItemIds;
         ViewBag.PriorOrderCount = GetSessionOrderIds(tableId).Count;
 
@@ -116,6 +121,18 @@ public class CustomerController : Controller
             });
 
         SaveCart(tableId, cart);
+
+        if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || (Request.Headers.Accept.ToString().Contains("application/json") && !Request.Headers.Accept.ToString().Contains("text/html")))
+        {
+            return Json(new
+            {
+                success = true,
+                cartCount = cart.Sum(c => c.Quantity),
+                total = cart.Sum(c => c.LineTotal),
+                itemName = item.Name
+            });
+        }
+
         return RedirectToAction(nameof(Menu), new { tableId, token = HttpContext.Session.GetString(TokenKey(tableId)) });
     }
 
@@ -132,9 +149,27 @@ public class CustomerController : Controller
         {
             if (quantity <= 0) cart.Remove(line);
             else line.Quantity = Math.Min(quantity, MaxLineQuantity);
+            SaveCart(tableId, cart);
         }
 
-        SaveCart(tableId, cart);
+        return RedirectToAction(nameof(Cart), new { tableId });
+    }
+
+    [HttpPost("table/{tableId:int}/cart/remove")]
+    [ValidateAntiForgeryToken]
+    public IActionResult RemoveFromCart(int tableId, int itemId, string? customization)
+    {
+        if (!TableSessionValid(tableId)) return View("InvalidTable");
+
+        var cart = GetCart(tableId);
+        var line = cart.FirstOrDefault(c => c.ItemID == itemId && c.Customization == customization);
+
+        if (line is not null)
+        {
+            cart.Remove(line);
+            SaveCart(tableId, cart);
+        }
+
         return RedirectToAction(nameof(Cart), new { tableId });
     }
 
@@ -262,6 +297,99 @@ public class CustomerController : Controller
             : RedirectToAction(nameof(Status), new { orderId = order.OrderID });
     }
 
+    // ---- Repayment Action ----
+    [HttpPost("repay")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Repay(int orderId, string paymentMode)
+    {
+        var order = await _db.Orders.Include(o => o.Table).Include(o => o.Payments).FirstOrDefaultAsync(o => o.OrderID == orderId);
+        if (order is null) return NotFound();
+
+        if (!TableSession.CanAccessOrder(HttpContext.Session, _qrCodeService, order.TableID, orderId))
+            return View("InvalidTable");
+
+        if (order.OrderStatus != OrderStatuses.PendingPayment)
+        {
+            TempData["StatusError"] = $"Order #{orderId} has been {order.OrderStatus.ToLowerInvariant()} and can no longer be paid.";
+            return RedirectToAction(nameof(Status), new { orderId });
+        }
+
+        if (_paymentService is null)
+            throw new InvalidOperationException("PaymentService is not configured.");
+
+        try
+        {
+            await _paymentService.InitiateRepaymentAsync(orderId, paymentMode);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["RepayError"] = ex.Message;
+            return RedirectToAction(nameof(Status), new { orderId });
+        }
+
+        return paymentMode == PaymentModes.Online
+            ? RedirectToAction("Checkout", "Payment", new { orderId = order.OrderID })
+            : RedirectToAction(nameof(Status), new { orderId = order.OrderID });
+    }
+
+    // ---- Customer Pre-KDS Order Cancellation ----
+    [HttpPost("order/cancel")]
+    [HttpPost("table/{tableId:int}/order/{orderId:int}/cancel")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CancelOrder(int orderId, int? tableId = null, string? reason = null)
+    {
+        var order = await _db.Orders
+            .Include(o => o.Table)
+            .Include(o => o.Payments)
+            .FirstOrDefaultAsync(o => o.OrderID == orderId);
+
+        if (order is null) return NotFound();
+
+        var effectiveTableId = tableId ?? order.TableID;
+        if (!TableSession.CanAccessOrder(HttpContext.Session, _qrCodeService, effectiveTableId, orderId))
+            return View("InvalidTable");
+
+        // Customer can ONLY cancel in pre-KDS states (PendingPayment or AwaitingVerification)
+        if (!OrderStatusStateMachine.CanCustomerCancel(order.OrderStatus))
+        {
+            TempData["StatusError"] = $"Order #{orderId} cannot be cancelled because it has already entered kitchen processing or is resolved.";
+            return RedirectToAction(nameof(Status), new { orderId });
+        }
+
+        if (!OrderStatusStateMachine.CanTransition(order.OrderStatus, OrderStatuses.Cancelled))
+        {
+            TempData["StatusError"] = $"Order #{orderId} cannot be transitioned to Cancelled from state '{order.OrderStatus}'.";
+            return RedirectToAction(nameof(Status), new { orderId });
+        }
+
+        var oldStatus = order.OrderStatus;
+        order.OrderStatus = OrderStatuses.Cancelled;
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            EntityType = "Orders",
+            EntityID = order.OrderID,
+            Action = "CustomerOrderCancelled",
+            OldValue = JsonSerializer.Serialize(new { OrderStatus = oldStatus }),
+            NewValue = JsonSerializer.Serialize(new
+            {
+                OrderStatus = OrderStatuses.Cancelled,
+                TableID = effectiveTableId,
+                Reason = string.IsNullOrWhiteSpace(reason) ? "Cancelled by customer before kitchen prep" : reason.Trim()
+            }),
+            PerformedBy = null, // Customer context
+            Timestamp = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+
+        await _realtime.BroadcastOrderStatusUpdateAsync(new OrderStatusUpdateDto(
+            order.OrderID, order.Table?.TableNumber ?? "", order.OrderStatus, DateTime.UtcNow));
+
+        TempData["StatusSuccess"] = "Your order has been cancelled successfully.";
+        return RedirectToAction(nameof(Status), new { orderId });
+    }
+
     // ---- Status tracking ----
 
     [HttpGet("table/{tableId:int}/orders")]
@@ -287,7 +415,7 @@ public class CustomerController : Controller
     {
         var order = await _db.Orders
             .Include(o => o.Table)
-            .Include(o => o.Payment)
+            .Include(o => o.Payments)
             .Include(o => o.OrderItems).ThenInclude(oi => oi.Item)
             .FirstOrDefaultAsync(o => o.OrderID == orderId);
 

@@ -15,11 +15,62 @@ namespace QServe.Controllers;
 public class AdminMenuController : Controller
 {
     private readonly ApplicationDbContext _db;
+    private readonly IWebHostEnvironment _env;
 
-    public AdminMenuController(ApplicationDbContext db)
+    public AdminMenuController(ApplicationDbContext db, IWebHostEnvironment env)
     {
         _db = db;
+        _env = env;
     }
+
+    private static readonly string[] AllowedImageExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
+    private const long MaxImageBytes = 5 * 1024 * 1024; // 5 MB
+
+    /// <summary>Saves an uploaded menu item image to wwwroot/images/menu-items and returns
+    /// the relative URL to store in MenuItem.ImageUrl. Returns (true, null, null) if no
+    /// file was provided — that's not an error, it just means "leave the image as-is".</summary>
+    private async Task<(bool Success, string? RelativeUrl, string? Error)> SaveMenuItemImageAsync(IFormFile? imageFile)
+    {
+        if (imageFile is null || imageFile.Length == 0)
+            return (true, null, null);
+
+        var extension = Path.GetExtension(imageFile.FileName).ToLowerInvariant();
+        if (!AllowedImageExtensions.Contains(extension))
+            return (false, null, "Image must be a JPG, PNG, WEBP, or GIF file.");
+
+        if (imageFile.Length > MaxImageBytes)
+            return (false, null, "Image must be smaller than 5 MB.");
+
+        var folder = Path.Combine(_env.WebRootPath, "images", "menu-items");
+        Directory.CreateDirectory(folder); // creates it on first run if it doesn't already exist
+
+        var fileName = $"{Guid.NewGuid():N}{extension}";
+        var filePath = Path.Combine(folder, fileName);
+
+        using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await imageFile.CopyToAsync(stream);
+        }
+
+        return (true, $"/images/menu-items/{fileName}", null);
+    }
+
+    /// <summary>Deletes a previously-uploaded menu item image file, if there is one. Only ever
+    /// touches files under images/menu-items — an item whose ImageUrl is some other external
+    /// URL (e.g. from before this change) is left alone.</summary>
+    private void DeleteMenuItemImageFile(string? relativeUrl)
+    {
+        if (string.IsNullOrWhiteSpace(relativeUrl) || !relativeUrl.StartsWith("/images/menu-items/"))
+            return;
+
+        var fileName = Path.GetFileName(relativeUrl);
+        var filePath = Path.Combine(_env.WebRootPath, "images", "menu-items", fileName);
+        if (System.IO.File.Exists(filePath))
+        {
+            System.IO.File.Delete(filePath);
+        }
+    }
+
 
     // ---- Menu Items ----
 
@@ -53,7 +104,7 @@ public class AdminMenuController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 20;
+        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
         var page = filter.Page > 0 ? filter.Page : 1;
 
         var items = await query
@@ -104,7 +155,7 @@ public class AdminMenuController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateItem(MenuItem item)
+    public async Task<IActionResult> CreateItem(MenuItem item, IFormFile? imageFile)
     {
         if (string.IsNullOrWhiteSpace(item.Name))
         {
@@ -132,10 +183,21 @@ public class AdminMenuController : Controller
             return View(item);
         }
 
+        // Only attempt the upload once the rest of the form is valid, so we don't write an
+        // orphaned file to disk for a submission that's about to be redisplayed anyway.
+        var (imageSaved, imageUrl, imageError) = await SaveMenuItemImageAsync(imageFile);
+        if (!imageSaved)
+        {
+            ModelState.AddModelError(nameof(item.ImageUrl), imageError!);
+            await PopulateCategoriesAsync();
+            return View(item);
+        }
+
         item.Name = item.Name.Trim();
         item.CreatedAt = DateTime.UtcNow;
         item.TotalOrdered = 0;
         item.RecentOrdered = 0;
+        item.ImageUrl = imageUrl;
 
         _db.MenuItems.Add(item);
         await _db.SaveChangesAsync();
@@ -156,7 +218,7 @@ public class AdminMenuController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> EditItem(int itemId, MenuItem updated)
+    public async Task<IActionResult> EditItem(int itemId, MenuItem updated, IFormFile? imageFile)
     {
         var item = await _db.MenuItems.FindAsync(itemId);
         if (item is null) return NotFound();
@@ -185,7 +247,25 @@ public class AdminMenuController : Controller
         {
             await PopulateCategoriesAsync();
             updated.ItemID = itemId;
+            updated.ImageUrl = item.ImageUrl; // keep showing the existing preview on validation failure
             return View(updated);
+        }
+
+        var newImageUrl = item.ImageUrl;
+        if (imageFile is not null && imageFile.Length > 0)
+        {
+            var (imageSaved, imageUrl, imageError) = await SaveMenuItemImageAsync(imageFile);
+            if (!imageSaved)
+            {
+                ModelState.AddModelError(nameof(updated.ImageUrl), imageError!);
+                await PopulateCategoriesAsync();
+                updated.ItemID = itemId;
+                updated.ImageUrl = item.ImageUrl;
+                return View(updated);
+            }
+
+            DeleteMenuItemImageFile(item.ImageUrl); // remove the old file now that the new one is saved
+            newImageUrl = imageUrl;
         }
 
         item.Name = updated.Name.Trim();
@@ -193,7 +273,7 @@ public class AdminMenuController : Controller
         item.Price = updated.Price;
         item.PrepTimeMinutes = updated.PrepTimeMinutes;
         item.ItemType = updated.ItemType;
-        item.ImageUrl = updated.ImageUrl;
+        item.ImageUrl = newImageUrl;
 
         await _db.SaveChangesAsync();
         TempData["MenuSuccess"] = $"Menu item \"{item.Name}\" updated.";
@@ -219,7 +299,24 @@ public class AdminMenuController : Controller
             else if (filter.Status == "Hidden") query = query.Where(c => !c.IsActive);
         }
 
-        filter.Categories = await query.OrderBy(c => c.DisplayOrder).ToListAsync();
+        var totalCount = await query.CountAsync();
+        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
+        var page = filter.Page > 0 ? filter.Page : 1;
+
+        var categories = await query
+            .OrderBy(c => c.DisplayOrder)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        filter.Categories = new PagedResult<MenuCategory>
+        {
+            Items = categories,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+
         return View(filter);
     }
 

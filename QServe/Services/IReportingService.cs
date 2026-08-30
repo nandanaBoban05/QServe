@@ -24,4 +24,7 @@ public interface IReportingService
 
     /// <summary>REP-7: orders and revenue per table, ranked.</summary>
     Task<List<TableUtilisationDto>> GetTableUtilisationReportAsync(DateTime rangeStart, DateTime rangeEnd);
+
+    /// <summary>REP-7: "busiest tables by hour" breakdown — order count per table, per hour-of-day.</summary>
+    Task<List<TableHourBucketDto>> GetTableUtilisationByHourAsync(DateTime rangeStart, DateTime rangeEnd);
 }

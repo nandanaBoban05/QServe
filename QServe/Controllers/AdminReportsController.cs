@@ -1,33 +1,60 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using QServe.Data;
 using QServe.Models;
 using QServe.Services;
+using QServe.ViewModels;
 
 namespace QServe.Controllers;
 
 /// <summary>
-/// Module 10: Reporting & Analytics. REP-8: Admin/Manager only, same as the rest of the
-/// Admin* controllers. Split from AdminController for the same reason AdminMenuController
-/// and AdminStaffController were split out — six reports is enough surface area to deserve
-/// its own controller rather than growing AdminController further.
+/// Module 10: Reporting & Analytics. REP-8: Admin/Manager only.
 /// </summary>
 [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Manager}")]
 public class AdminReportsController : Controller
 {
     private readonly IReportingService _reports;
+    private readonly ApplicationDbContext _db;
 
-    public AdminReportsController(IReportingService reports)
+    public AdminReportsController(IReportingService reports, ApplicationDbContext db)
     {
         _reports = reports;
+        _db = db;
     }
 
-    // REP-1: daily by default, but any range works via the date pickers.
+    // REP-1: daily/range sales analytics with historical trend chart
+    // PRD Reports Specification (§3) classifies this report's trigger as "Daily / on-demand",
+    // and REP-1 (§4) says the default for a daily-trigger report is "today" — not the 7-day
+    // default used for weekly-trigger reports (Popular Items, Table Utilisation).
     [HttpGet]
     public async Task<IActionResult> Sales(DateTime? start, DateTime? end)
     {
-        var (rangeStart, rangeEnd) = ResolveRange(start, end, defaultDays: 1);
+        var (rangeStart, rangeEnd) = ResolveRange(start, end, defaultDays: 0);
         var report = await _reports.GetDailySalesSummaryAsync(rangeStart, rangeEnd);
         SetRangeViewBag(rangeStart, rangeEnd);
+
+        var rangeOrders = await _db.Orders.AsNoTracking()
+            .Where(o => o.CreatedAt >= rangeStart && o.CreatedAt < rangeEnd && o.OrderStatus != OrderStatuses.Cancelled)
+            .Select(o => new { o.CreatedAt, o.TotalAmount })
+            .ToListAsync();
+
+        var totalDays = Math.Max(1, (int)(rangeEnd.Date - rangeStart.Date).TotalDays);
+        var trend = Enumerable.Range(0, totalDays)
+            .Select(offset => rangeStart.Date.AddDays(offset))
+            .Select(day =>
+            {
+                var dayOrders = rangeOrders.Where(o => o.CreatedAt.Date == day).ToList();
+                return new DailyTrendPoint
+                {
+                    Date = day,
+                    OrderCount = dayOrders.Count,
+                    Revenue = dayOrders.Sum(o => o.TotalAmount)
+                };
+            })
+            .ToList();
+
+        ViewBag.Trend = trend;
         return View(report);
     }
 
@@ -54,14 +81,26 @@ public class AdminReportsController : Controller
         return View(throughput);
     }
 
-    // REP-5: on-demand, daily by default.
+    // REP-5: on-demand, daily by default with pagination support.
     [HttpGet]
-    public async Task<IActionResult> PaymentLog(DateTime? start, DateTime? end)
+    public async Task<IActionResult> PaymentLog(DateTime? start, DateTime? end, int page = 1, int pageSize = 10)
     {
         var (rangeStart, rangeEnd) = ResolveRange(start, end, defaultDays: 1);
-        var log = await _reports.GetPaymentVerificationLogAsync(rangeStart, rangeEnd);
+        var allLogs = await _reports.GetPaymentVerificationLogAsync(rangeStart, rangeEnd);
         SetRangeViewBag(rangeStart, rangeEnd);
-        return View(log);
+
+        var totalCount = allLogs.Count;
+        var pagedItems = allLogs.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        var pagedResult = new PagedResult<PaymentVerificationLogEntryDto>
+        {
+            Items = pagedItems,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+
+        return View(pagedResult);
     }
 
     // REP-6: on-demand, daily by default.
@@ -80,7 +119,9 @@ public class AdminReportsController : Controller
     {
         var (rangeStart, rangeEnd) = ResolveRange(start, end, defaultDays: 7);
         var report = await _reports.GetTableUtilisationReportAsync(rangeStart, rangeEnd);
+        var byHour = await _reports.GetTableUtilisationByHourAsync(rangeStart, rangeEnd);
         SetRangeViewBag(rangeStart, rangeEnd);
+        ViewBag.ByHour = byHour;
         return View(report);
     }
 

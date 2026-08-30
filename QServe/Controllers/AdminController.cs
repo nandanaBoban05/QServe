@@ -1,8 +1,10 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QServe.Data;
+using QServe.Hubs;
 using QServe.Models;
 using QServe.Services;
 using QServe.ViewModels;
@@ -17,56 +19,93 @@ public class AdminController : Controller
     private readonly IQrCodeService _qrCodeService;
     private readonly IPaymentService _paymentService;
     private readonly IConfiguration _config;
+    private readonly IRealtimeNotifier? _realtime;
 
     public AdminController(
         ApplicationDbContext db,
         IQrCodeService qrCodeService,
         IPaymentService paymentService,
-        IConfiguration config)
+        IConfiguration config,
+        IRealtimeNotifier? realtime = null)
     {
         _db = db;
         _qrCodeService = qrCodeService;
         _paymentService = paymentService;
         _config = config;
+        _realtime = realtime;
     }
 
-    // ADM-7: landing dashboard — today's order count, revenue, pending verifications, plus
-    // operational counts, a 7-day trend, and a recent-activity feed pulled from AuditLogs.
+    // ADM-7: operational real-time command center dashboard — live kitchen activity,
+    // active order tickets, state counts, operational KPIs, and recent orders.
     [HttpGet]
     public async Task<IActionResult> Index()
     {
         var todayStart = DateTime.UtcNow.Date;
+        var yesterdayStart = todayStart.AddDays(-1);
 
         var todayOrdersQuery = _db.Orders.AsNoTracking()
             .Where(o => o.CreatedAt >= todayStart);
 
         var todayOrderCount = await todayOrdersQuery
             .CountAsync(o => o.OrderStatus != OrderStatuses.Cancelled);
-
-        var todayRevenue = await todayOrdersQuery
-            .Where(o => o.OrderStatus != OrderStatuses.Cancelled)
+        var yesterdayRevenue = await _db.Orders.AsNoTracking()
+            .Where(o => o.CreatedAt >= yesterdayStart && o.CreatedAt < todayStart && o.OrderStatus != OrderStatuses.Cancelled)
             .SumAsync(o => (decimal?)o.TotalAmount) ?? 0m;
-
         var todayCompletedCount = await todayOrdersQuery
             .CountAsync(o => o.OrderStatus == OrderStatuses.Served);
-
         var todayCancelledCount = await todayOrdersQuery
             .CountAsync(o => o.OrderStatus == OrderStatuses.Cancelled);
-
         var todayOnlineRevenue = await todayOrdersQuery
-            .Where(o => o.OrderStatus != OrderStatuses.Cancelled && o.Payment != null && o.Payment.PaymentMode == PaymentModes.Online && o.Payment.PaymentStatus == PaymentStatuses.Received)
+            .Where(o => o.OrderStatus != OrderStatuses.Cancelled && o.Payments.Any(p => p.PaymentMode == PaymentModes.Online && p.PaymentStatus == PaymentStatuses.Received))
+            .SumAsync(o => (decimal?)o.TotalAmount) ?? 0m;
+        var todayOfflineRevenue = await todayOrdersQuery
+            .Where(o => o.OrderStatus != OrderStatuses.Cancelled && o.Payments.Any(p => p.PaymentMode != PaymentModes.Online && p.PaymentStatus == PaymentStatuses.Received))
             .SumAsync(o => (decimal?)o.TotalAmount) ?? 0m;
 
-        var todayOfflineRevenue = await todayOrdersQuery
-            .Where(o => o.OrderStatus != OrderStatuses.Cancelled && o.Payment != null && o.Payment.PaymentMode != PaymentModes.Online && o.Payment.PaymentStatus == PaymentStatuses.Received)
-            .SumAsync(o => (decimal?)o.TotalAmount) ?? 0m;
+        // "Today's Revenue" is labelled "settled" in the UI, so it must be built from the
+        // two Received-payment-only queries above — not a separate, looser query that
+        // also counted PendingPayment/AwaitingVerification orders as revenue.
+        var todayRevenue = todayOnlineRevenue + todayOfflineRevenue;
 
         var pendingVerificationCount = await _db.Payments.AsNoTracking().CountAsync(p =>
             p.PaymentStatus == PaymentStatuses.Pending
             && (p.PaymentMode == PaymentModes.Cash || p.PaymentMode == PaymentModes.Card));
 
+        var pendingPaymentCount = await _db.Orders.AsNoTracking().CountAsync(o =>
+            o.OrderStatus == OrderStatuses.PendingPayment || o.OrderStatus == OrderStatuses.AwaitingVerification);
+
+        var pendingActionCount = pendingVerificationCount + pendingPaymentCount;
+
+        // Kitchen order state counts
+        var newOrdersCount = await _db.Orders.AsNoTracking().CountAsync(o =>
+            o.OrderStatus == OrderStatuses.Approved || o.OrderStatus == OrderStatuses.PendingPayment || o.OrderStatus == OrderStatuses.AwaitingVerification);
+
+        var preparingOrdersCount = await _db.Orders.AsNoTracking().CountAsync(o =>
+            o.OrderStatus == OrderStatuses.Preparing);
+
+        var readyOrdersCount = await _db.Orders.AsNoTracking().CountAsync(o =>
+            o.OrderStatus == OrderStatuses.Ready);
+
         var activeOrderCount = await _db.Orders.AsNoTracking().CountAsync(o =>
             o.OrderStatus != OrderStatuses.Served && o.OrderStatus != OrderStatuses.Cancelled);
+
+        // Active kitchen orders (ordered by oldest/waiting first)
+        var activeKitchenOrders = await _db.Orders.AsNoTracking()
+            .Where(o => o.OrderStatus != OrderStatuses.Served && o.OrderStatus != OrderStatuses.Cancelled)
+            .Include(o => o.Table)
+            .Include(o => o.Payments)
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Item)
+            .OrderBy(o => o.CreatedAt)
+            .ToListAsync();
+
+        // Recent orders stream (latest 8 orders)
+        var recentOrders = await _db.Orders.AsNoTracking()
+            .Include(o => o.Table)
+            .Include(o => o.Payments)
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(8)
+            .ToListAsync();
 
         var weekStart = todayStart.AddDays(-6);
         var weekOrders = await _db.Orders.AsNoTracking()
@@ -91,7 +130,7 @@ public class AdminController : Controller
         var recentActivity = await _db.AuditLogs.AsNoTracking()
             .Include(a => a.PerformedByUser)
             .OrderByDescending(a => a.Timestamp)
-            .Take(8)
+            .Take(6)
             .Select(a => new RecentActivityItem
             {
                 Action = a.Action,
@@ -106,12 +145,20 @@ public class AdminController : Controller
         {
             TodayOrderCount = todayOrderCount,
             TodayRevenue = todayRevenue,
+            YesterdayRevenue = yesterdayRevenue,
             TodayCompletedOrderCount = todayCompletedCount,
             TodayCancelledOrderCount = todayCancelledCount,
             TodayOnlineRevenue = todayOnlineRevenue,
             TodayOfflineRevenue = todayOfflineRevenue,
             PendingVerificationCount = pendingVerificationCount,
+            PendingActionCount = pendingActionCount,
+            NewOrdersCount = newOrdersCount,
+            PreparingOrdersCount = preparingOrdersCount,
+            ReadyOrdersCount = readyOrdersCount,
+            CompletedOrdersCount = todayCompletedCount,
             ActiveOrderCount = activeOrderCount,
+            ActiveKitchenOrders = activeKitchenOrders,
+            RecentOrders = recentOrders,
             ActiveTableCount = await _db.RestaurantTables.AsNoTracking().CountAsync(t => t.IsActive),
             MenuItemCount = await _db.MenuItems.AsNoTracking().CountAsync(),
             ActiveStaffCount = await _db.Users.AsNoTracking().CountAsync(u => u.IsActive),
@@ -122,13 +169,15 @@ public class AdminController : Controller
         return View(stats);
     }
 
+
+
     // ADM-4: Server-side filtered and paginated Orders monitor.
     [HttpGet]
     public async Task<IActionResult> Orders([FromQuery] AdminOrderFilterViewModel filter)
     {
         var query = _db.Orders.AsNoTracking()
             .Include(o => o.Table)
-            .Include(o => o.Payment)
+            .Include(o => o.Payments)
             .AsQueryable();
 
         // Search: Order ID or Table Number or Notes
@@ -164,12 +213,12 @@ public class AdminController : Controller
 
         if (!string.IsNullOrWhiteSpace(filter.PaymentStatus) && filter.PaymentStatus != "All")
         {
-            query = query.Where(o => o.Payment != null && o.Payment.PaymentStatus == filter.PaymentStatus);
+            query = query.Where(o => o.Payments.Any(p => p.PaymentStatus == filter.PaymentStatus));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.PaymentMode) && filter.PaymentMode != "All")
         {
-            query = query.Where(o => o.Payment != null && o.Payment.PaymentMode == filter.PaymentMode);
+            query = query.Where(o => o.Payments.Any(p => p.PaymentMode == filter.PaymentMode));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.OrderType) && filter.OrderType != "All")
@@ -190,7 +239,7 @@ public class AdminController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 20;
+        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
         var page = filter.Page > 0 ? filter.Page : 1;
 
         var orders = await query
@@ -221,28 +270,81 @@ public class AdminController : Controller
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.Item)
                     .ThenInclude(i => i!.Category)
-            .Include(o => o.Payment)
-                .ThenInclude(p => p!.VerifiedByUser)
+            .Include(o => o.Payments)
+                .ThenInclude(p => p.VerifiedByUser)
             .FirstOrDefaultAsync(o => o.OrderID == id);
 
         if (order is null) return NotFound();
 
-        var paymentId = order.Payment?.PaymentID ?? 0;
+        var paymentAttempts = await _db.Payments.AsNoTracking()
+            .Include(p => p.VerifiedByUser)
+            .Where(p => p.OrderID == id)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
+
+        var paymentIds = paymentAttempts.Select(p => p.PaymentID).ToList();
 
         var timeline = await _db.AuditLogs.AsNoTracking()
             .Include(a => a.PerformedByUser)
             .Where(a => (a.EntityType == "Orders" && a.EntityID == id)
-                     || (paymentId > 0 && a.EntityType == "Payments" && a.EntityID == paymentId))
+                     || (a.EntityType == "Payments" && (paymentIds.Contains(a.EntityID) || a.EntityID == id)))
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
         var vm = new AdminOrderDetailsViewModel
         {
             Order = order,
-            Timeline = timeline
+            Timeline = timeline,
+            PaymentAttempts = paymentAttempts
         };
 
         return View(vm);
+    }
+
+    [HttpPost("Admin/CancelOrder")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CancelOrder(int orderId, string? reason = null)
+    {
+        var adminUserIdRaw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int? adminUserId = int.TryParse(adminUserIdRaw, out var parsedId) ? parsedId : null;
+
+        var order = await _db.Orders
+            .Include(o => o.Table)
+            .Include(o => o.Payments)
+            .FirstOrDefaultAsync(o => o.OrderID == orderId);
+
+        if (order is null) return NotFound();
+
+        if (order.OrderStatus == OrderStatuses.Cancelled || !OrderStatusStateMachine.CanTransition(order.OrderStatus, OrderStatuses.Cancelled))
+        {
+            TempData["OrderDetailsError"] = $"Order #{orderId} is already cancelled or cannot be cancelled from state '{order.OrderStatus}'.";
+            return RedirectToAction(nameof(OrderDetails), new { id = orderId });
+        }
+
+        var oldStatus = order.OrderStatus;
+        order.OrderStatus = OrderStatuses.Cancelled;
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            EntityType = "Orders",
+            EntityID = order.OrderID,
+            Action = "OrderCancelledByStaff",
+            OldValue = JsonSerializer.Serialize(new { OrderStatus = oldStatus }),
+            NewValue = JsonSerializer.Serialize(new { OrderStatus = OrderStatuses.Cancelled, Reason = string.IsNullOrWhiteSpace(reason) ? "Cancelled by staff" : reason.Trim() }),
+            PerformedBy = adminUserId,
+            Timestamp = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+
+        if (_realtime != null)
+        {
+            await _realtime.BroadcastOrderStatusUpdateAsync(new OrderStatusUpdateDto(
+                order.OrderID, order.Table?.TableNumber ?? "", order.OrderStatus, DateTime.UtcNow));
+        }
+
+        TempData["OrderDetailsSuccess"] = $"Order #{orderId} has been cancelled.";
+        return RedirectToAction(nameof(OrderDetails), new { id = orderId });
     }
 
     // Server-side filtered and paginated Payments list.
@@ -307,7 +409,7 @@ public class AdminController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 20;
+        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
         var page = filter.Page > 0 ? filter.Page : 1;
 
         var payments = await query
@@ -363,7 +465,7 @@ public class AdminController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 20;
+        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
         var page = filter.Page > 0 ? filter.Page : 1;
 
         var tables = await query
@@ -465,30 +567,86 @@ public class AdminController : Controller
     // ---- Module 5: Payment Processing (admin-side verification queue) ----
 
     [HttpGet]
-    public async Task<IActionResult> PaymentQueue()
+    public async Task<IActionResult> PaymentQueue([FromQuery] AdminPaymentQueueFilterViewModel filter)
     {
-        var pending = await _db.Payments.AsNoTracking()
+        var query = _db.Payments.AsNoTracking()
             .Include(p => p.Order).ThenInclude(o => o!.Table)
+            .Include(p => p.Order).ThenInclude(o => o!.OrderItems).ThenInclude(oi => oi.Item)
             .Where(p => p.PaymentStatus == PaymentStatuses.Pending
                         && (p.PaymentMode == PaymentModes.Cash || p.PaymentMode == PaymentModes.Card))
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var search = filter.Search.Trim();
+            if (int.TryParse(search.TrimStart('#'), out var parsedId))
+            {
+                query = query.Where(p => p.OrderID == parsedId || p.PaymentID == parsedId || (p.Order != null && p.Order.Table != null && p.Order.Table.TableNumber.Contains(search)));
+            }
+            else
+            {
+                query = query.Where(p => (p.Order != null && p.Order.Table != null && p.Order.Table.TableNumber.Contains(search)));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.PaymentMode) && filter.PaymentMode != "All")
+        {
+            query = query.Where(p => p.PaymentMode == filter.PaymentMode);
+        }
+
+        if (filter.DateFrom.HasValue)
+        {
+            var from = filter.DateFrom.Value.Date;
+            query = query.Where(p => p.CreatedAt >= from);
+        }
+
+        if (filter.DateTo.HasValue)
+        {
+            var toExclusive = filter.DateTo.Value.Date.AddDays(1);
+            query = query.Where(p => p.CreatedAt < toExclusive);
+        }
+
+        var totalCount = await query.CountAsync();
+        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
+        var page = filter.Page > 0 ? filter.Page : 1;
+
+        var items = await query
             .OrderBy(p => p.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
-        return View(pending);
+        filter.Payments = new PagedResult<Payment>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+
+        return View(filter);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> VerifyPayment(int paymentId, bool approve)
+    public async Task<IActionResult> VerifyPayment(int paymentId, bool approve, string? rejectionReason = null, string? returnUrl = null)
     {
         var adminUserIdRaw = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(adminUserIdRaw, out var adminUserId))
             return Unauthorized();
 
-        var payment = await _db.Payments.FindAsync(paymentId);
+        var payment = await _db.Payments.Include(p => p.Order).FirstOrDefaultAsync(p => p.PaymentID == paymentId);
         if (payment is null) return NotFound();
 
-        await _paymentService.AdminVerifyAsync(paymentId, approve, adminUserId);
+        await _paymentService.AdminVerifyAsync(paymentId, approve, adminUserId, rejectionReason);
+
+        TempData["PaymentQueueMessage"] = approve
+            ? $"Payment #{paymentId} for Order #{payment.OrderID} approved successfully."
+            : $"Payment #{paymentId} for Order #{payment.OrderID} was rejected: {rejectionReason ?? "Rejected by staff"}. Customer can now retry payment.";
+
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            return Redirect(returnUrl);
+
         return RedirectToAction(nameof(PaymentQueue));
     }
 
@@ -545,7 +703,7 @@ public class AdminController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 30;
+        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
         var page = filter.Page > 0 ? filter.Page : 1;
 
         var logs = await query
@@ -570,4 +728,6 @@ public class AdminController : Controller
 
         return View(filter);
     }
+
+
 }

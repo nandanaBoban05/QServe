@@ -2,13 +2,18 @@
     ViewData["Title"] = "Error";
 }
 
-<div class="page page--auth">
-    <div class="auth-card" style="text-align:center;">
-        <img src="~/images/logo.png" alt="QServe" class="brand-logo brand-logo--plain" width="48" height="48" style="margin:0 auto 12px;" />
-        <h1 style="font-size:20px;">Something went wrong</h1>
-        <p class="text-muted" style="font-size:13.5px; margin-top:12px;">
-            An unexpected error occurred. Please try again, or contact support if the problem persists.
+<div class="page page--auth" style="text-align:center;">
+    <div class="auth-card">
+        <div style="margin:0 auto 14px; display:inline-block;">
+            <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "54" }, { "LogoHeight", "54" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
+        </div>
+        <span class="badge badge-cancelled" style="font-size:12px; margin-bottom:12px;">System Notice</span>
+        <h1 class="headline-md" style="margin-top:8px; margin-bottom:10px;">Something went wrong</h1>
+        <p class="text-muted" style="font-size:14px; line-height:1.55; margin-bottom:24px;">
+            An unexpected error occurred while processing your request. Please try again or return to the main dashboard.
         </p>
-        <p style="margin-top:18px;"><a asp-controller="Account" asp-action="Login">Back to login</a></p>
+        <a asp-controller="Account" asp-action="Login" class="btn btn-primary btn-block" style="padding:12px;">
+            Return to Staff Login
+        </a>
     </div>
 </div>

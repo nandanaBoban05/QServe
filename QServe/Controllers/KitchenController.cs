@@ -64,16 +64,19 @@ public class KitchenController : Controller
         var orders = await query.OrderBy(o => o.CreatedAt).ToListAsync();
 
         // Calculate live tab counts for kitchen staff
-        var allActiveOrders = await _db.Orders.AsNoTracking()
+        var allKitchenOrders = await _db.Orders.AsNoTracking()
             .Where(o => ActiveStatuses.Contains(o.OrderStatus) || (o.OrderStatus == OrderStatuses.Served && o.CreatedAt >= todayStart))
-            .Select(o => o.OrderStatus)
+            .Select(o => new { o.OrderStatus, o.OrderType })
             .ToListAsync();
 
-        ViewBag.ActiveCount = allActiveOrders.Count(s => ActiveStatuses.Contains(s));
-        ViewBag.ApprovedCount = allActiveOrders.Count(s => s == OrderStatuses.Approved);
-        ViewBag.PreparingCount = allActiveOrders.Count(s => s == OrderStatuses.Preparing);
-        ViewBag.ReadyCount = allActiveOrders.Count(s => s == OrderStatuses.Ready);
-        ViewBag.ServedTodayCount = allActiveOrders.Count(s => s == OrderStatuses.Served);
+        ViewBag.ActiveCount = allKitchenOrders.Count(s => ActiveStatuses.Contains(s.OrderStatus));
+        ViewBag.ApprovedCount = allKitchenOrders.Count(s => s.OrderStatus == OrderStatuses.Approved);
+        ViewBag.PreparingCount = allKitchenOrders.Count(s => s.OrderStatus == OrderStatuses.Preparing);
+        ViewBag.ReadyCount = allKitchenOrders.Count(s => s.OrderStatus == OrderStatuses.Ready);
+        ViewBag.ServedTodayCount = allKitchenOrders.Count(s => s.OrderStatus == OrderStatuses.Served);
+        ViewBag.QuickCount = allKitchenOrders.Count(s => ActiveStatuses.Contains(s.OrderStatus) && s.OrderType == OrderTypes.Quick);
+        ViewBag.RegularCount = allKitchenOrders.Count(s => ActiveStatuses.Contains(s.OrderStatus) && s.OrderType == OrderTypes.Regular);
+        ViewBag.HeavyCount = allKitchenOrders.Count(s => ActiveStatuses.Contains(s.OrderStatus) && s.OrderType == OrderTypes.Heavy);
         ViewBag.CurrentStatusFilter = status ?? "Active";
 
         var sorted = string.Equals(status, "Served", StringComparison.OrdinalIgnoreCase)

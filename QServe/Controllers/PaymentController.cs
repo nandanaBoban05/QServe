@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QServe.Data;
+using QServe.Models;
 using QServe.Services;
 
 namespace QServe.Controllers;
@@ -26,24 +27,38 @@ public class PaymentController : Controller
         _qrCodeService = qrCodeService;
     }
 
-    // Landed on from Module 4's Checkout when paymentMode == Online.
+    // Landed on from Module 4's Checkout or Status Pay Now when paymentMode == Online.
     [HttpGet("checkout/{orderId:int}")]
     public async Task<IActionResult> Checkout(int orderId)
     {
-        var order = await _db.Orders.FirstOrDefaultAsync(o => o.OrderID == orderId);
+        var order = await _db.Orders
+            .Include(o => o.Payments)
+            .FirstOrDefaultAsync(o => o.OrderID == orderId);
         if (order is null) return NotFound();
 
         if (!TableSession.CanAccessOrder(HttpContext.Session, _qrCodeService, order.TableID, orderId))
             return RedirectToAction("InvalidTable", "Customer");
 
-        if (order.OrderStatus != "PendingPayment")
+        if (order.OrderStatus != OrderStatuses.PendingPayment)
         {
-            // Already resolved (approved/cancelled) — nothing to pay, send them to status.
+            // Already resolved (approved/cancelled/served) — nothing to pay, send them to status.
+            if (order.OrderStatus == OrderStatuses.Cancelled)
+            {
+                TempData["StatusError"] = $"Order #{orderId} has been cancelled and is no longer payable.";
+            }
             return RedirectToAction("Status", "Customer", new { orderId });
         }
 
-        var checkoutInfo = await _paymentService.InitiateOnlinePaymentAsync(orderId);
-        return View(checkoutInfo);
+        try
+        {
+            var checkoutInfo = await _paymentService.InitiateOnlinePaymentAsync(orderId);
+            return View(checkoutInfo);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["StatusError"] = ex.Message;
+            return RedirectToAction("Status", "Customer", new { orderId });
+        }
     }
 
     // Called by the browser JS after Razorpay's checkout widget reports success.

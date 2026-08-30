@@ -1,0 +1,7 @@
+@{
+    var width = ViewData["LogoWidth"] ?? "36";
+    var height = ViewData["LogoHeight"] ?? "36";
+    var cssClass = ViewData["LogoClass"] ?? "brand-logo";
+    var alt = ViewData["LogoAlt"] ?? "QServe Logo";
+}
+<img src="~/images/qserve_logo.png" alt="@alt" width="@width" height="@height" class="@cssClass" />

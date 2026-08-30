@@ -6,10 +6,21 @@
 <partial name="_AdminNav" />
 
 <div class="page page--narrow">
-    <span class="eyebrow">Menu</span>
-    <h1>New Item</h1>
+    <div class="page-head">
+        <div>
+            <a asp-action="Index" class="btn btn-ghost btn-sm" style="margin-bottom:8px; padding-left:0;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Menu Items
+            </a>
+            <span class="eyebrow" style="display:block;">Menu Catalog</span>
+            <h1 class="headline-lg">Add New Item</h1>
+        </div>
+    </div>
 
-    <div class="card mt-lg">
+    <div class="card">
         @if (!ViewData.ModelState.IsValid)
         {
             <div class="validation-summary-errors">
@@ -20,12 +31,12 @@
             </div>
         }
 
-        <form asp-action="CreateItem" method="post">
+        <form asp-action="CreateItem" method="post" enctype="multipart/form-data">
             @Html.AntiForgeryToken()
 
             <div class="form-group">
-                <label>Name</label>
-                <input type="text" name="Name" required />
+                <label>Item Name</label>
+                <input type="text" name="Name" placeholder="e.g. Butter Chicken Burger" required autofocus />
             </div>
 
             <div class="form-group">
@@ -39,32 +50,36 @@
             </div>
 
             <div class="form-group">
-                <label>Item Type <span class="text-muted" style="text-transform:none; font-weight:400;">— feeds the kitchen priority classifier</span></label>
+                <label>Item Type <span class="text-muted" style="text-transform:none; font-weight:400;">— drives kitchen queue priority classification</span></label>
                 <select name="ItemType" required>
                     <option value="Beverage">Beverage</option>
-                    <option value="Quick">Quick</option>
-                    <option value="Cooked">Cooked</option>
+                    <option value="Quick">Quick (&le;10 min prep)</option>
+                    <option value="Cooked">Cooked (Main kitchen course)</option>
                     <option value="Dessert">Dessert</option>
                 </select>
             </div>
 
             <div class="field-row">
                 <div class="form-group" style="flex:1;">
-                    <label>Price (₹)</label>
-                    <input type="number" name="Price" step="0.01" min="0.01" required />
+                    <label>Unit Price (₹)</label>
+                    <input type="number" name="Price" step="0.01" min="0.01" placeholder="250.00" required />
                 </div>
                 <div class="form-group" style="flex:1;">
-                    <label>Prep Time (min)</label>
+                    <label>Estimated Prep Time (minutes)</label>
                     <input type="number" name="PrepTimeMinutes" value="10" min="1" />
                 </div>
             </div>
 
             <div class="form-group">
-                <label>Image URL (optional)</label>
-                <input type="text" name="ImageUrl" />
+                <label>Item Image (optional)</label>
+                <input type="file" name="imageFile" accept="image/png, image/jpeg, image/webp, image/gif" />
+                <span class="text-muted" style="font-size:12px; display:block; margin-top:4px;">JPG, PNG, WEBP or GIF — up to 5 MB.</span>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-block">Create Item</button>
+            <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--surface-container-high); display:flex; gap:12px; justify-content:flex-end;">
+                <a asp-action="Index" class="btn btn-outline">Cancel</a>
+                <button type="submit" class="btn btn-primary" style="padding:10px 24px;">+ Create Menu Item</button>
+            </div>
         </form>
     </div>
 </div>

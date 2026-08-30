@@ -1,21 +1,22 @@
 @model QServe.Models.Order
 @{
     ViewData["Title"] = "Order #" + Model.OrderID.ToString("D5");
+    var latestPayment = Model.Payment;
+    bool isPaymentRejected = latestPayment != null && (latestPayment.PaymentStatus == "Failed" || latestPayment.PaymentStatus == "Refunded");
 }
 
 <div class="ticket-shell" style="text-align:center;">
     <div class="ticket-brand">
-        <img src="~/images/logo.png" alt="QServe" width="20" height="20" class="brand-logo brand-logo--plain" />
-        <span>QServe</span>
+        <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "130" }, { "LogoHeight", "50" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
     </div>
-    <span class="eyebrow">Order Confirmation &amp; Live Tracking</span>
-    <h1 class="mono" style="font-size:26px; margin:4px 0;">#@Model.OrderID.ToString("D5")</h1>
-    <p class="text-muted mono" style="font-size:13px; margin-top:-2px; margin-bottom:16px;">
-        Table @(Model.Table?.TableNumber ?? Model.TableID.ToString()) &middot; @Model.CreatedAt.ToString("MMM d, HH:mm")
+    <span class="eyebrow">Order Confirmation</span>
+    <h1 class="mono" style="font-size:30px; margin:4px 0; font-weight:800; color:var(--on-surface);">#@Model.OrderID.ToString("D5")</h1>
+    <p class="text-muted mono" style="font-size:13.5px; margin-top:-2px; margin-bottom:20px;">
+        Table @(Model.Table?.TableNumber ?? Model.TableID.ToString()) &middot; @Model.CreatedAt.ToString("MMM d, HH:mm") UTC
     </p>
 
     <!-- Visual Milestone Tracker -->
-    <div class="punch-tracker" style="margin:20px 0;">
+    <div class="punch-tracker">
         @{
             var steps = new[] { "Approved", "Preparing", "Ready", "Served" };
         }
@@ -28,89 +29,296 @@
         }
     </div>
 
-    <!-- Live Status Banner -->
-    <div class="card" style="padding:16px; margin-bottom:20px; background:var(--surface);">
-        <span class="eyebrow" style="font-size:10px;">Current Status</span>
-        <div style="font-size:18px; font-weight:700; margin-top:2px;" id="status-text">
-            @Model.OrderStatus
-        </div>
-
-        @if (Model.OrderStatus is "PendingPayment" or "AwaitingVerification")
-        {
-            <p class="text-muted" style="font-size:13px; margin:8px 0 0;">
-                Waiting on payment confirmation — this screen updates automatically once approved.
-            </p>
-        }
-        else if (Model.OrderStatus == "Approved")
-        {
-            <p class="text-muted" style="font-size:13px; margin:8px 0 0; color:var(--curry);">
-                Order approved! The kitchen has received your ticket.
-            </p>
-        }
-        else if (Model.OrderStatus == "Preparing")
-        {
-            <p class="text-muted" style="font-size:13px; margin:8px 0 0; color:var(--turmeric-deep);">
-                Your food is actively being prepared in the kitchen.
-            </p>
-        }
-        else if (Model.OrderStatus == "Ready")
-        {
-            <p class="text-muted" style="font-size:13px; margin:8px 0 0; color:var(--curry); font-weight:600;">
-                Your order is ready! A staff member is bringing it to your table.
-            </p>
-        }
-        else if (Model.OrderStatus == "Served")
-        {
-            <p class="text-muted" style="font-size:13px; margin:8px 0 0; color:var(--ink-soft);">
-                Enjoy your meal! Thank you for dining with QServe.
-            </p>
-        }
-        else if (Model.OrderStatus == "Cancelled")
-        {
-            <p style="color:var(--tamarind); font-size:13px; margin:8px 0 0;">
-                This order was cancelled. Please speak to a staff member.
-            </p>
-        }
-    </div>
-
-    <!-- Order Items Summary Chit -->
-    @if (Model.OrderItems.Any())
+    @if (TempData["StatusSuccess"] is string succMsg)
     {
-        <div class="card" style="text-align:left; padding:14px 16px; margin-bottom:20px;">
-            <span class="eyebrow" style="font-size:10px; display:block; margin-bottom:8px;">Order Summary</span>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-                @foreach (var item in Model.OrderItems)
-                {
-                    <div style="display:flex; justify-content:space-between; font-size:13px;">
-                        <div>
-                            <span><strong>@item.Quantity &times;</strong> @(item.Item?.Name ?? "Item #" + item.ItemID)</span>
-                            @if (!string.IsNullOrWhiteSpace(item.Customization))
-                            {
-                                <div class="text-muted" style="font-size:11px;">@item.Customization</div>
-                            }
-                        </div>
-                        <span class="mono">₹@((item.Quantity * item.UnitPrice).ToString("0.00"))</span>
-                    </div>
-                }
-            </div>
-
-            <div style="border-top:1px dashed var(--border); margin-top:10px; padding-top:8px; display:flex; justify-content:space-between; font-size:14px; font-weight:700;">
-                <span>Total Paid / Payable</span>
-                <span class="mono" style="color:var(--turmeric-deep);">₹@Model.TotalAmount.ToString("0.00")</span>
+        <div class="card" style="background:var(--status-ready-bg); border:1px solid var(--status-ready-border); padding:12px 16px; margin-bottom:16px; text-align:left; color:var(--status-ready-text);">
+            <div style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span>@succMsg</span>
             </div>
         </div>
     }
 
-    <div style="display:flex; flex-direction:column; gap:8px;">
-        <a href="@Url.Action("Menu", new { tableId = Model.TableID })" class="btn btn-primary btn-block" style="padding:14px;">
+    @if (TempData["StatusError"] is string errMsg)
+    {
+        <div class="card" style="background:var(--error-container); border:1px solid var(--error); padding:12px 16px; margin-bottom:16px; text-align:left; color:var(--on-error-container);">
+            <div style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>@errMsg</span>
+            </div>
+        </div>
+    }
+
+    @if (TempData["RepayError"] is string repayErr)
+    {
+        <div class="card" style="background:var(--error-container); border:1px solid var(--error); padding:12px 16px; margin-bottom:16px; text-align:left; color:var(--on-error-container);">
+            <div style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>@repayErr</span>
+            </div>
+        </div>
+    }
+
+    <!-- Live Status Banner Card -->
+    <div class="card" style="padding:20px; margin-bottom:20px; text-align:center;">
+        <span class="eyebrow" style="font-size:11px;">Current Order State</span>
+        <div style="font-size:20px; font-weight:700; margin-top:4px; color:var(--on-surface);" id="status-text">
+            @if (Model.OrderStatus == "PendingPayment" && isPaymentRejected)
+            {
+                <span style="color:var(--error);">Payment Rejected</span>
+            }
+            else
+            {
+                @Model.OrderStatus
+            }
+        </div>
+
+        @if (Model.OrderStatus == "Cancelled")
+        {
+            @if (isPaymentRejected)
+            {
+                <div style="background:#fef2f2; border:1px solid #fee2e2; border-radius:var(--radius-md); padding:12px 14px; margin-top:14px; text-align:left;">
+                    <div style="display:flex; align-items:center; gap:8px; color:var(--error); font-weight:600; font-size:13.5px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        Previous payment attempt was not verified: @(string.IsNullOrEmpty(latestPayment?.RejectionReason) ? "Payment was rejected" : latestPayment.RejectionReason)
+                    </div>
+                </div>
+            }
+            <p style="color:var(--error); font-size:14px; margin:14px 0 0; font-weight:600;">
+                This order has been cancelled and can no longer be paid.
+            </p>
+        }
+        else if (Model.OrderStatus == "PendingPayment" && isPaymentRejected)
+        {
+            <div style="background:#fef2f2; border:1px solid #fee2e2; border-radius:var(--radius-md); padding:12px 14px; margin-top:14px; text-align:left;">
+                <div style="display:flex; align-items:center; gap:8px; color:var(--error); font-weight:600; font-size:14px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    Payment not verified
+                </div>
+                <p style="margin:6px 0 0; font-size:13.5px; color:var(--on-surface);">
+                    Reason: <strong>@(string.IsNullOrEmpty(latestPayment?.RejectionReason) ? "Staff could not verify the payment attempt." : latestPayment.RejectionReason)</strong>
+                </p>
+                <p style="margin:4px 0 0; font-size:12.5px; color:var(--on-surface-variant);">
+                    Your order is safely preserved. Please choose a payment method below to pay again.
+                </p>
+            </div>
+        }
+        else if (Model.OrderStatus == "PendingPayment")
+        {
+            <p class="text-muted" style="font-size:13.5px; margin:10px 0 0;">
+                Waiting for payment completion. Click below to continue with your payment.
+            </p>
+            <div style="margin-top:16px;">
+                @if (latestPayment?.PaymentMode == "Online")
+                {
+                    <a href="@Url.Action("Checkout", "Payment", new { orderId = Model.OrderID })" id="pay-now-btn" class="btn btn-primary btn-block" style="padding:14px; font-size:15px; font-weight:700; border-radius:var(--radius-pill); box-shadow:0 4px 14px rgba(245, 158, 11, 0.35); text-decoration:none; display:inline-block;">
+                        Pay Now &bull; ₹@Model.TotalAmount.ToString("0.00")
+                    </a>
+                }
+                else
+                {
+                    <a href="#repayForm" class="btn btn-primary btn-block" style="padding:14px; font-size:15px; font-weight:700; border-radius:var(--radius-pill); box-shadow:0 4px 14px rgba(245, 158, 11, 0.35); text-decoration:none; display:inline-block;">
+                        Choose Payment Method &bull; ₹@Model.TotalAmount.ToString("0.00")
+                    </a>
+                }
+            </div>
+        }
+        else if (Model.OrderStatus == "AwaitingVerification")
+        {
+            <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:var(--radius-md); padding:16px; margin-top:14px; text-align:left;">
+                <div style="display:flex; align-items:center; gap:8px; color:#92400e; font-weight:700; font-size:14px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    Payment Method: @(latestPayment?.PaymentMode == "Card" ? "POS Card" : "Cash")
+                </div>
+                <div style="margin-top:8px; font-size:13.5px; color:var(--on-surface);">
+                    <strong>Next Step:</strong>
+                    @if (latestPayment?.PaymentMode == "Card")
+                    {
+                        <span>Please go to the Cash Manager / Front Desk for POS card payment. Staff will process the card payment and approve the payment from the admin system.</span>
+                    }
+                    else
+                    {
+                        <span>Please go to the Cash Manager / Front Desk and make your cash payment. Staff will verify and approve the payment from the admin system.</span>
+                    }
+                </div>
+                <p style="margin:8px 0 0; font-size:12.5px; color:var(--on-surface-variant);">
+                    Once payment is completed, staff will verify and approve your payment. This screen will update automatically.
+                </p>
+            </div>
+        }
+        else if (Model.OrderStatus == "Approved")
+        {
+            <p style="font-size:13.5px; margin:10px 0 0; color:var(--status-approved-text); font-weight:500;">
+                Order approved! The kitchen has received your ticket and will start preparation shortly.
+            </p>
+        }
+        else if (Model.OrderStatus == "Preparing")
+        {
+            <p style="font-size:13.5px; margin:10px 0 0; color:var(--status-preparing-text); font-weight:500;">
+                Your food is actively being prepared by the culinary staff.
+            </p>
+        }
+        else if (Model.OrderStatus == "Ready")
+        {
+            <p style="font-size:13.5px; margin:10px 0 0; color:var(--status-ready-text); font-weight:600;">
+                Your order is ready! A staff member is bringing it to Table @(Model.Table?.TableNumber ?? Model.TableID.ToString()).
+            </p>
+        }
+        else if (Model.OrderStatus == "Served")
+        {
+            <p style="font-size:13.5px; margin:10px 0 0; color:var(--on-surface-variant); font-weight:500;">
+                Enjoy your meal! Thank you for dining with QServe.
+            </p>
+        }
+    </div>
+
+    <!-- Repayment Card (Visible ONLY when Order is PendingPayment AND payment was rejected/failed) -->
+    @if (Model.OrderStatus == "PendingPayment" && isPaymentRejected)
+    {
+        <div class="card" style="text-align:left; padding:18px 20px; margin-bottom:20px; border-color:var(--primary); background:var(--surface);" id="repayCard">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                    <line x1="1" y1="10" x2="23" y2="10"></line>
+                </svg>
+                <h3 style="margin:0; font-size:16px; font-weight:700;">Retry Payment</h3>
+            </div>
+
+            <form asp-controller="Customer" asp-action="Repay" method="post" id="repayForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="orderId" value="@Model.OrderID" />
+
+                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+                    <label style="display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid var(--outline-variant); border-radius:var(--radius-lg); cursor:pointer; background:var(--surface-container-lowest);">
+                        <input type="radio" name="paymentMode" value="Online" checked style="accent-color:var(--primary);" />
+                        <div>
+                            <strong style="display:block; font-size:14px; color:var(--on-surface);">Online Payment (UPI, Cards, NetBanking)</strong>
+                            <span class="text-muted" style="font-size:12px;">Instant confirmation via Razorpay</span>
+                        </div>
+                    </label>
+
+                    <label style="display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid var(--outline-variant); border-radius:var(--radius-lg); cursor:pointer; background:var(--surface-container-lowest);">
+                        <input type="radio" name="paymentMode" value="Cash" style="accent-color:var(--primary);" />
+                        <div>
+                            <strong style="display:block; font-size:14px; color:var(--on-surface);">Cash Payment at Front Desk</strong>
+                            <span class="text-muted" style="font-size:12px;">Please make your cash payment at the Cash Manager / Front Desk</span>
+                        </div>
+                    </label>
+
+                    <label style="display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid var(--outline-variant); border-radius:var(--radius-lg); cursor:pointer; background:var(--surface-container-lowest);">
+                        <input type="radio" name="paymentMode" value="Card" style="accent-color:var(--primary);" />
+                        <div>
+                            <strong style="display:block; font-size:14px; color:var(--on-surface);">POS Card Payment at Front Desk</strong>
+                            <span class="text-muted" style="font-size:12px;">Please swipe/tap card at the Cash Manager / Front Desk POS terminal</span>
+                        </div>
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block" style="padding:14px; font-size:15px; font-weight:700; border-radius:var(--radius-pill);">
+                    Pay Again &bull; ₹@Model.TotalAmount.ToString("0.00")
+                </button>
+            </form>
+        </div>
+    }
+
+    <!-- Order Items Summary Chit -->
+    @if (Model.OrderItems.Any())
+    {
+        <div class="card" style="text-align:left; padding:18px 20px; margin-bottom:24px;">
+            <span class="eyebrow" style="font-size:11px; display:block; margin-bottom:12px;">Order Summary</span>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                @foreach (var item in Model.OrderItems)
+                {
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; font-size:14px;">
+                        <div>
+                            <span style="color:var(--on-surface);"><strong>@item.Quantity &times;</strong> @(item.Item?.Name ?? "Item #" + item.ItemID)</span>
+                            @if (!string.IsNullOrWhiteSpace(item.Customization))
+                            {
+                                <div class="text-muted" style="font-size:12px; margin-top:2px; font-style:italic;">Note: @item.Customization</div>
+                            }
+                        </div>
+                        <span class="mono" style="font-weight:600;">₹@((item.Quantity * item.UnitPrice).ToString("0.00"))</span>
+                    </div>
+                }
+            </div>
+
+            <div style="border-top:1px dashed var(--outline-variant); margin-top:14px; padding-top:12px; display:flex; justify-content:space-between; font-size:16px; font-weight:700;">
+                <span>Total Amount</span>
+                <span class="mono" style="color:var(--primary); font-size:18px;">₹@Model.TotalAmount.ToString("0.00")</span>
+            </div>
+        </div>
+    }
+
+    <div style="display:flex; flex-direction:column; gap:10px;">
+        @if (QServe.Services.OrderStatusStateMachine.CanCustomerCancel(Model.OrderStatus))
+        {
+            <button type="button" id="customer-cancel-order-btn" class="btn btn-outline btn-block" style="color:var(--error); border-color:var(--error); padding:12px; font-weight:600; border-radius:var(--radius-pill);" onclick="openCancelOrderModal()">
+                Cancel Order
+            </button>
+        }
+        <a href="@Url.Action("Menu", new { tableId = Model.TableID })" class="btn btn-secondary btn-block" style="padding:13px; border-radius:var(--radius-pill);">
             + Order More Items
         </a>
         @if ((int)(ViewBag.SessionOrderCount ?? 0) > 1)
         {
-            <a href="@Url.Action("TableOrders", new { tableId = Model.TableID })" class="btn btn-outline btn-block">
+            <a href="@Url.Action("TableOrders", new { tableId = Model.TableID })" class="btn btn-outline btn-block" style="border-radius:var(--radius-pill);">
                 View All Table Orders
             </a>
         }
+    </div>
+</div>
+
+<!-- Cancel Order Confirmation Modal -->
+<div id="cancelOrderModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:16px;">
+    <div class="card" style="max-width:440px; width:100%; box-shadow:var(--shadow-lg); border-radius:var(--radius-xl); text-align:left; padding:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:8px; color:var(--error);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+                <h3 style="margin:0; font-size:18px;">Cancel this order?</h3>
+            </div>
+            <button type="button" onclick="closeCancelOrderModal()" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:18px;">&times;</button>
+        </div>
+
+        <p style="font-size:14px; color:var(--on-surface-variant); margin-bottom:20px; line-height:1.5;">
+            Your order has not entered the kitchen yet. Are you sure you want to cancel it?
+        </p>
+
+        <form asp-action="CancelOrder" method="post" onsubmit="return handleCancelSubmit(this);">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="orderId" value="@Model.OrderID" />
+            <input type="hidden" name="tableId" value="@Model.TableID" />
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeCancelOrderModal()" style="border-radius:var(--radius-pill); padding:10px 18px;">Keep Order</button>
+                <button type="submit" id="confirm-cancel-btn" class="btn btn-danger" style="border-radius:var(--radius-pill); padding:10px 18px;">Cancel Order</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -118,6 +326,24 @@
 <script>
     const currentOrderId = @Model.OrderID;
     const stepOrder = ["Approved", "Preparing", "Ready", "Served"];
+
+    function openCancelOrderModal() {
+        document.getElementById('cancelOrderModal').style.display = 'flex';
+    }
+
+    function closeCancelOrderModal() {
+        document.getElementById('cancelOrderModal').style.display = 'none';
+    }
+
+    function handleCancelSubmit(form) {
+        const btn = document.getElementById('confirm-cancel-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            btn.textContent = 'Cancelling...';
+        }
+        return true;
+    }
 
     function applyStatus(newStatus) {
         if (!newStatus) return;
@@ -129,6 +355,17 @@
             const currentIdx = stepOrder.indexOf(newStatus);
             el.classList.toggle("done", currentIdx >= 0 && idx <= currentIdx);
         });
+
+        // Hide cancel button if order left pre-KDS
+        const cancelBtn = document.getElementById("customer-cancel-order-btn");
+        if (cancelBtn && (newStatus === "Approved" || newStatus === "Preparing" || newStatus === "Ready" || newStatus === "Served" || newStatus === "Cancelled")) {
+            cancelBtn.style.display = "none";
+        }
+
+        // If status changed to Approved, reload to update UI
+        if (newStatus === "Approved" || newStatus === "PendingPayment" || newStatus === "AwaitingVerification" || newStatus === "Cancelled") {
+            setTimeout(() => window.location.reload(), 1200);
+        }
     }
 
     const connection = new signalR.HubConnectionBuilder()

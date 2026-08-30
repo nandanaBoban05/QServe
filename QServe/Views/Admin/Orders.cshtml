@@ -9,20 +9,20 @@
     <div class="page-head">
         <div>
             <span class="eyebrow">Operations</span>
-            <h1>Order Management</h1>
+            <h1 class="headline-lg">Order Management</h1>
         </div>
-        <div class="mono text-muted" style="font-size:13px;">
-            Total: <strong>@Model.Orders.TotalCount</strong> orders
+        <div class="text-muted mono" style="font-size:13.5px;">
+            Total: <strong style="color:var(--on-surface);">@Model.Orders.TotalCount</strong> orders recorded
         </div>
     </div>
 
-    <!-- Filter Form -->
-    <div class="card" style="margin-bottom:20px; padding:18px 20px;">
+    <!-- Standardized Filter Card Component -->
+    <div class="filter-card">
         <form method="get" asp-action="Orders">
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:12px; align-items:flex-end;">
+            <div class="filter-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
                 <div class="form-group" style="margin-bottom:0;">
-                    <label>Search</label>
-                    <input type="text" name="Search" value="@Model.Search" placeholder="Order #, Table..." />
+                    <label>Search Orders</label>
+                    <input type="text" name="Search" value="@Model.Search" placeholder="Order #, notes..." />
                 </div>
 
                 <div class="form-group" style="margin-bottom:0;">
@@ -42,7 +42,7 @@
                     <label>Order Status</label>
                     <select name="OrderStatus">
                         <option value="All" selected="@(Model.OrderStatus == "All" || string.IsNullOrEmpty(Model.OrderStatus) ? "selected" : null)">All Statuses</option>
-                        <option value="Active" selected="@(Model.OrderStatus == "Active" ? "selected" : null)">⚡ Active Only</option>
+                        <option value="Active" selected="@(Model.OrderStatus == "Active" ? "selected" : null)">⚡ Active Live Orders</option>
                         <option value="PendingPayment" selected="@(Model.OrderStatus == "PendingPayment" ? "selected" : null)">Pending Payment</option>
                         <option value="AwaitingVerification" selected="@(Model.OrderStatus == "AwaitingVerification" ? "selected" : null)">Awaiting Verification</option>
                         <option value="Approved" selected="@(Model.OrderStatus == "Approved" ? "selected" : null)">Approved</option>
@@ -79,9 +79,9 @@
                     <label>Tier</label>
                     <select name="OrderType">
                         <option value="All" selected="@(Model.OrderType == "All" || string.IsNullOrEmpty(Model.OrderType) ? "selected" : null)">All Tiers</option>
-                        <option value="Quick" selected="@(Model.OrderType == "Quick" ? "selected" : null)">Quick</option>
+                        <option value="Quick" selected="@(Model.OrderType == "Quick" ? "selected" : null)">Quick (&le;10m)</option>
                         <option value="Regular" selected="@(Model.OrderType == "Regular" ? "selected" : null)">Regular</option>
-                        <option value="Heavy" selected="@(Model.OrderType == "Heavy" ? "selected" : null)">Heavy</option>
+                        <option value="Heavy" selected="@(Model.OrderType == "Heavy" ? "selected" : null)">Heavy (&gt;25m)</option>
                     </select>
                 </div>
 
@@ -95,33 +95,47 @@
                     <input type="date" name="DateTo" value="@(Model.DateTo?.ToString("yyyy-MM-dd"))" />
                 </div>
 
-                <div style="display:flex; gap:6px;">
-                    <button type="submit" class="btn btn-primary btn-sm" style="height:40px; flex:1;">Filter</button>
-                    <a asp-action="Orders" class="btn btn-outline btn-sm" style="height:40px; padding:0 12px; display:inline-flex; align-items:center;">Reset</a>
+                <div class="filter-actions">
+                    <a asp-action="Orders" class="btn btn-secondary">Reset</a>
+                    <button type="submit" class="btn btn-primary">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                        Filter
+                    </button>
                 </div>
             </div>
         </form>
     </div>
 
-    <!-- Orders Table -->
-    <div class="card">
+    <!-- Orders Table Card -->
+    <div class="card" style="padding:0; overflow:hidden;">
     @if (!Model.Orders.Items.Any())
     {
-        <p class="kds-empty">No orders matching the selected filters.</p>
+        <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            <p class="empty-state-text">No orders matching the selected criteria.</p>
+            <a asp-action="Orders" class="btn btn-secondary btn-sm">Reset Filters</a>
+        </div>
     }
     else
     {
-        <div style="overflow-x:auto;">
+        <div class="data-table-container" style="border:none; border-radius:0;">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Order</th>
+                        <th>Order ID</th>
                         <th>Table</th>
                         <th>Status</th>
                         <th>Tier</th>
                         <th>Payment</th>
-                        <th>Total</th>
-                        <th>Placed</th>
+                        <th>Total Amount</th>
+                        <th>Placed (UTC)</th>
                         <th style="text-align:right;">Action</th>
                     </tr>
                 </thead>
@@ -130,46 +144,57 @@
                 {
                     <tr>
                         <td class="num">
-                            <a asp-action="OrderDetails" asp-route-id="@order.OrderID" style="font-weight:700; text-decoration:underline;">
+                            <a asp-action="OrderDetails" asp-route-id="@order.OrderID" style="font-weight:700; color:var(--primary); text-decoration:none;">
                                 #@order.OrderID.ToString("D5")
                             </a>
                         </td>
-                        <td>Table @(order.Table?.TableNumber ?? "-")</td>
+                        <td>
+                            <strong style="color:var(--on-surface);">Table @(order.Table?.TableNumber ?? "-")</strong>
+                        </td>
                         <td>
                             @{
                                 string badgeClass = order.OrderStatus switch {
-                                    "Approved" => "badge-curry",
-                                    "Preparing" => "badge-turmeric",
-                                    "Ready" => "badge-curry",
-                                    "Served" => "badge-steel",
-                                    "Cancelled" => "badge-tamarind",
-                                    _ => "badge-steel"
+                                    "Approved" => "badge-approved",
+                                    "Preparing" => "badge-preparing",
+                                    "Ready" => "badge-ready",
+                                    "Served" => "badge-served",
+                                    "Cancelled" => "badge-cancelled",
+                                    "PendingPayment" => "badge-pending",
+                                    "AwaitingVerification" => "badge-awaiting",
+                                    _ => "badge-neutral"
                                 };
                             }
                             <span class="badge @badgeClass">@order.OrderStatus</span>
                         </td>
                         <td>
-                            <span class="badge @(order.OrderType == "Quick" ? "badge-curry" : order.OrderType == "Heavy" ? "badge-tamarind" : "badge-turmeric")">
+                            <span class="badge @(order.OrderType == "Quick" ? "tier-quick" : order.OrderType == "Heavy" ? "tier-heavy" : "tier-regular")">
                                 @order.OrderType
                             </span>
                         </td>
                         <td>
-                            @if (order.Payment != null)
+                            @{
+                                var pay = order.Payment;
+                            }
+                            @if (pay != null)
                             {
-                                <span style="font-size:12px;">@order.Payment.PaymentMode</span>
-                                <span class="badge @(order.Payment.PaymentStatus == "Received" ? "badge-curry" : order.Payment.PaymentStatus == "Refunded" || order.Payment.PaymentStatus == "Failed" ? "badge-tamarind" : "badge-turmeric")" style="font-size:9px; margin-left:2px;">
-                                    @order.Payment.PaymentStatus
-                                </span>
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <span style="font-size:12.5px; color:var(--on-surface);">@pay.PaymentMode</span>
+                                    <span class="badge @(pay.PaymentStatus == "Received" ? "badge-ready" : pay.PaymentStatus == "Refunded" || pay.PaymentStatus == "Failed" ? "badge-cancelled" : "badge-pending")" style="font-size:10px;">
+                                        @pay.PaymentStatus
+                                    </span>
+                                </div>
                             }
                             else
                             {
                                 <span class="text-muted" style="font-size:12px;">None</span>
                             }
                         </td>
-                        <td class="num" style="font-weight:600;">₹@order.TotalAmount.ToString("0.00")</td>
-                        <td class="num" style="font-size:12.5px;">@order.CreatedAt.ToString("MMM d, HH:mm")</td>
+                        <td class="num" style="font-weight:700; color:var(--on-surface);">₹@order.TotalAmount.ToString("0.00")</td>
+                        <td class="num text-muted" style="font-size:12.5px;">@order.CreatedAt.ToString("MMM d, HH:mm")</td>
                         <td style="text-align:right;">
-                            <a asp-action="OrderDetails" asp-route-id="@order.OrderID" class="btn btn-outline btn-sm">Details →</a>
+                            <a asp-action="OrderDetails" asp-route-id="@order.OrderID" class="btn btn-secondary btn-sm" style="padding:4px 10px; font-weight:600;">
+                                View Order &rarr;
+                            </a>
                         </td>
                     </tr>
                 }
