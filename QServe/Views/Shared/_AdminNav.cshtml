@@ -20,7 +20,7 @@
     <label for="sidebar-toggle" class="mobile-topbar__hamburger" aria-label="Open menu">
         <span class="material-symbols-outlined">menu</span>
     </label>
-    <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoHeight", "28" }, { "LogoWidth", "112" }, { "LogoClass", "mobile-topbar__logo" } }' />
+    <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "110" }, { "LogoClass", "mobile-topbar__logo" } }' />
 </div>
 
 <!-- Tapping the dimmed backdrop closes the drawer -->
@@ -34,8 +34,7 @@
 
     <!-- Brand Header with actual QServe Logo asset -->
     <a asp-controller="Admin" asp-action="Index" class="sidebar__brand">
-        <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoHeight", "50" }, { "LogoWidth", "200" }, { "LogoClass", "sidebar__brand-logo" } }' />
-
+        <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "170" }, { "LogoClass", "sidebar__brand-logo" } }' />
     </a>
 
     <!-- Admin User Badge Card -->

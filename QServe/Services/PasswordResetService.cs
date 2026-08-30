@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using QServe.Data;
@@ -17,14 +18,16 @@ public class PasswordResetService : IPasswordResetService
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<PasswordResetService> _logger;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public PasswordResetService(
-        ApplicationDbContext db, 
-        IEmailSender emailSender, 
+        ApplicationDbContext db,
+        IEmailSender emailSender,
         IEmailTemplateService templateService,
-        IConfiguration config, 
+        IConfiguration config,
         IWebHostEnvironment env,
-        ILogger<PasswordResetService> logger)
+        ILogger<PasswordResetService> logger,
+        IHttpContextAccessor httpContextAccessor)
     {
         _db = db;
         _emailSender = emailSender;
@@ -32,6 +35,7 @@ public class PasswordResetService : IPasswordResetService
         _config = config;
         _env = env;
         _logger = logger;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<string?> RequestResetAsync(string email)
@@ -60,8 +64,7 @@ public class PasswordResetService : IPasswordResetService
 
         await _db.SaveChangesAsync();
 
-        var baseUrl = _config["App:BaseUrl"]?.TrimEnd('/')
-            ?? throw new InvalidOperationException("App:BaseUrl is not configured.");
+        var baseUrl = ResolveBaseUrl();
         var resetLink = $"{baseUrl}/Account/ResetPassword?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(rawToken)}";
 
         try
@@ -123,5 +126,18 @@ public class PasswordResetService : IPasswordResetService
 
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    private string ResolveBaseUrl()
+    {
+        var configured = _config["App:BaseUrl"];
+        if (!string.IsNullOrWhiteSpace(configured) && !configured.Contains("localhost", StringComparison.OrdinalIgnoreCase))
+            return configured.TrimEnd('/');
+
+        var request = _httpContextAccessor.HttpContext?.Request;
+        if (request is not null)
+            return $"{request.Scheme}://{request.Host}";
+
+        throw new InvalidOperationException("App:BaseUrl is not configured and no active HTTP request is available to derive it from.");
     }
 }

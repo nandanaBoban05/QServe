@@ -12,7 +12,7 @@ using QServe.Data;
 namespace QServe.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260829122604_seed data")]
+    [Migration("20260830125153_seed data")]
     partial class seeddata
     {
         /// <inheritdoc />
@@ -447,20 +447,6 @@ namespace QServe.Migrations
                             Name = "Veg Noodles",
                             PrepTimeMinutes = 15,
                             Price = 170m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 21,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1585032226651-759b368d7246?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Cooked",
-                            Name = "Chicken Noodles",
-                            PrepTimeMinutes = 20,
-                            Price = 230m,
                             RecentOrdered = 0,
                             TotalOrdered = 0
                         },
@@ -932,7 +918,7 @@ namespace QServe.Migrations
                             TableID = 1,
                             Capacity = 4,
                             IsActive = true,
-                            QRCodeData = "https://localhost/order/table/1",
+                            QRCodeData = "",
                             TableNumber = "T01"
                         },
                         new
@@ -940,7 +926,7 @@ namespace QServe.Migrations
                             TableID = 2,
                             Capacity = 4,
                             IsActive = true,
-                            QRCodeData = "https://localhost/order/table/2",
+                            QRCodeData = "",
                             TableNumber = "T02"
                         },
                         new
@@ -948,7 +934,7 @@ namespace QServe.Migrations
                             TableID = 3,
                             Capacity = 4,
                             IsActive = true,
-                            QRCodeData = "https://localhost/order/table/3",
+                            QRCodeData = "",
                             TableNumber = "T03"
                         },
                         new
@@ -956,7 +942,7 @@ namespace QServe.Migrations
                             TableID = 4,
                             Capacity = 4,
                             IsActive = true,
-                            QRCodeData = "https://localhost/order/table/4",
+                            QRCodeData = "",
                             TableNumber = "T04"
                         },
                         new
@@ -964,7 +950,7 @@ namespace QServe.Migrations
                             TableID = 5,
                             Capacity = 4,
                             IsActive = true,
-                            QRCodeData = "https://localhost/order/table/5",
+                            QRCodeData = "",
                             TableNumber = "T05"
                         });
                 });
@@ -1034,7 +1020,7 @@ namespace QServe.Migrations
                             Email = "admin@restaurant.local",
                             FullName = "System Admin",
                             IsActive = true,
-                            PasswordHash = "$2a$11$nPKn7yUv1JMWALFKgggF/.VM9XOhmvFGAMN./hSXZ.8zeOKyvRmJG",
+                            PasswordHash = "$2a$11$QMyrjjsBLb7obUvnOtfbiu.H5O0IrMWVqsAOCG0OS4xuUkUsj/ct2",
                             Role = "Admin"
                         },
                         new
@@ -1045,7 +1031,7 @@ namespace QServe.Migrations
                             Email = "kitchen@restaurant.local",
                             FullName = "Kitchen Staff",
                             IsActive = true,
-                            PasswordHash = "$2a$11$vSH1GMys6Zlhe25fKCb8oeai5j/pWb1eh96bJFlG4Cth5HY9Ncb/e",
+                            PasswordHash = "$2a$11$iXo607uYZzXx9Lves8pkEeihb0WrXiAYfO0ka./e1.hKTKt3T554W",
                             Role = "Kitchen"
                         },
                         new
@@ -1056,7 +1042,7 @@ namespace QServe.Migrations
                             Email = "manager@restaurant.local",
                             FullName = "Restaurant Manager",
                             IsActive = true,
-                            PasswordHash = "$2a$11$HdNbWIG2BSgTdcHQ7eQDxujg.zy6/16LgPC3AbBriZXZPojU368xm",
+                            PasswordHash = "$2a$11$GQqWprbnqdgn/88W318q1.CIMOKhOgJYQo9F.wij6ERJMS4H5hgve",
                             Role = "Manager"
                         });
                 });

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using QRCoder;
 using QServe.Data;
@@ -10,11 +11,13 @@ public class QrCodeService : IQrCodeService
 {
     private readonly ApplicationDbContext _db;
     private readonly IConfiguration _config;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public QrCodeService(ApplicationDbContext db, IConfiguration config)
+    public QrCodeService(ApplicationDbContext db, IConfiguration config, IHttpContextAccessor httpContextAccessor)
     {
         _db = db;
         _config = config;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<byte[]> GenerateForTableAsync(int tableId)
@@ -23,8 +26,7 @@ public class QrCodeService : IQrCodeService
             ?? throw new InvalidOperationException($"Table {tableId} not found.");
 
         var token = BuildToken(tableId);
-        var baseUrl = _config["App:BaseUrl"]?.TrimEnd('/')
-            ?? throw new InvalidOperationException("App:BaseUrl is not configured.");
+        var baseUrl = ResolveBaseUrl();
         var url = $"{baseUrl}/order/table/{tableId}?token={Uri.EscapeDataString(token)}";
 
         table.QRCodeData = url;
@@ -60,5 +62,22 @@ public class QrCodeService : IQrCodeService
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
         var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(tableId.ToString()));
         return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    // Prefers an explicit, non-localhost App:BaseUrl (real production override). Otherwise
+    // derives the origin from the current request — this is what makes the QR automatically
+    // pick up the Dev Tunnel's HTTPS URL, since UseForwardedHeaders (Program.cs) rewrites
+    // Request.Scheme/Request.Host to the tunnel's public values.
+    private string ResolveBaseUrl()
+    {
+        var configured = _config["App:BaseUrl"];
+        if (!string.IsNullOrWhiteSpace(configured) && !configured.Contains("localhost", StringComparison.OrdinalIgnoreCase))
+            return configured.TrimEnd('/');
+
+        var request = _httpContextAccessor.HttpContext?.Request;
+        if (request is not null)
+            return $"{request.Scheme}://{request.Host}";
+
+        throw new InvalidOperationException("App:BaseUrl is not configured and no active HTTP request is available to derive it from.");
     }
 }

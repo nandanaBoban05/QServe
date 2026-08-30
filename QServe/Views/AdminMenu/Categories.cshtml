@@ -91,9 +91,11 @@
                 {
                     @foreach (var category in Model.Categories.Items)
                     {
-                        <tr class="@(category.IsActive ? "" : "is-dim")">
+                        var itemCount = category.Items?.Count ?? 0;
+
+                        <tr class="@(category.IsActive ? "" : "is-dim")" id="cat-view-@category.CategoryID">
                             <td><strong style="color:var(--on-surface); font-size:14.5px;">@category.Name</strong></td>
-                            <td class="num">@(category.Items?.Count ?? 0) items</td>
+                            <td class="num">@itemCount items</td>
                             <td class="num">@category.DisplayOrder</td>
                             <td>
                                 <span class="badge @(category.IsActive ? "badge-ready" : "badge-neutral")">
@@ -101,11 +103,48 @@
                                 </span>
                             </td>
                             <td style="text-align:right;">
-                                <form asp-action="ToggleCategoryActive" method="post" style="display:inline;">
+                                <div style="display:inline-flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+                                    <button type="button" class="btn btn-outline btn-sm" style="padding:4px 10px;"
+                                            onclick="qserveToggleCategoryEdit(@category.CategoryID)">
+                                        Edit
+                                    </button>
+
+                                    <form asp-action="ToggleCategoryActive" method="post" style="display:inline;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="categoryId" value="@category.CategoryID" />
+                                        <button type="submit" class="btn btn-outline btn-sm" style="padding:4px 10px;">
+                                            @(category.IsActive ? "Hide Section" : "Show Section")
+                                        </button>
+                                    </form>
+
+                                    <form asp-action="DeleteCategory" method="post" style="display:inline;"
+                                          onsubmit="return confirm('Delete category &quot;@category.Name&quot;? This cannot be undone.@(itemCount > 0 ? " It currently has " + itemCount + " item(s), so this will be blocked until they are moved or removed." : "")');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="categoryId" value="@category.CategoryID" />
+                                        <button type="submit" class="btn btn-outline btn-sm" style="padding:4px 10px; color:var(--error); border-color:#fecaca;">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr id="cat-edit-@category.CategoryID" class="cat-edit-row" style="display:none;">
+                            <td colspan="5" style="background:var(--surface-container-lowest); padding:14px 16px; border-top:1px dashed var(--outline-subtle);">
+                                <form asp-action="EditCategory" method="post" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="categoryId" value="@category.CategoryID" />
-                                    <button type="submit" class="btn btn-outline btn-sm" style="padding:4px 10px;">
-                                        @(category.IsActive ? "Hide Section" : "Show Section")
+                                    <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;">
+                                        <label>Category Name</label>
+                                        <input type="text" name="name" value="@category.Name" required />
+                                    </div>
+                                    <div class="form-group" style="margin-bottom:0; width:140px;">
+                                        <label>Display Order</label>
+                                        <input type="number" name="displayOrder" value="@category.DisplayOrder" min="1" max="99" required />
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-sm" style="padding:0 18px; height:38px;">Save</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" style="padding:0 18px; height:38px;"
+                                            onclick="qserveToggleCategoryEdit(@category.CategoryID)">
+                                        Cancel
                                     </button>
                                 </form>
                             </td>
@@ -139,3 +178,14 @@
         </form>
     </div>
 </div>
+
+<script>
+    // UI-only: toggles the inline edit row for a category between hidden/visible.
+    // Doesn't touch any data — actual saving happens via the normal POST form to EditCategory.
+    function qserveToggleCategoryEdit(categoryId) {
+        var editRow = document.getElementById('cat-edit-' + categoryId);
+        if (!editRow) return;
+        var isVisible = editRow.style.display !== 'none';
+        editRow.style.display = isVisible ? 'none' : 'table-row';
+    }
+</script>

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace QServe.Migrations
 {
     /// <inheritdoc />
-    public partial class initial : Migration
+    public partial class seeddata : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -196,6 +196,7 @@ namespace QServe.Migrations
                     RazorpayPaymentID = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
                     VerifiedBy = table.Column<int>(type: "int", nullable: true),
                     VerificationTime = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    RejectionReason = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -232,11 +233,11 @@ namespace QServe.Migrations
                 columns: new[] { "TableID", "Capacity", "IsActive", "QRCodeData", "TableNumber" },
                 values: new object[,]
                 {
-                    { 1, 4, true, "https://localhost/order/table/1", "T01" },
-                    { 2, 4, true, "https://localhost/order/table/2", "T02" },
-                    { 3, 4, true, "https://localhost/order/table/3", "T03" },
-                    { 4, 4, true, "https://localhost/order/table/4", "T04" },
-                    { 5, 4, true, "https://localhost/order/table/5", "T05" }
+                    { 1, 4, true, "", "T01" },
+                    { 2, 4, true, "", "T02" },
+                    { 3, 4, true, "", "T03" },
+                    { 4, 4, true, "", "T04" },
+                    { 5, 4, true, "", "T05" }
                 });
 
             migrationBuilder.InsertData(
@@ -244,9 +245,9 @@ namespace QServe.Migrations
                 columns: new[] { "UserID", "AccessFailedCount", "CreatedAt", "Email", "FullName", "IsActive", "LockoutEnd", "PasswordHash", "PasswordResetTokenExpiry", "PasswordResetTokenHash", "Role" },
                 values: new object[,]
                 {
-                    { 1, 0, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "admin@restaurant.local", "System Admin", true, null, "$2a$11$qeuWfT3Trc9jwgc/c1wiuu976WqXO.Ky7vkyDPXbC8yp49IQW5svi", null, null, "Admin" },
-                    { 2, 0, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "kitchen@restaurant.local", "Kitchen Staff", true, null, "$2a$11$r/EF2qcOpYImHhRJ/gPanO4wjQQLubCc98GFRmkTl5pCFpZs3GAGG", null, null, "Kitchen" },
-                    { 3, 0, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "manager@restaurant.local", "Restaurant Manager", true, null, "$2a$11$rwv6qCoAlVJavgawV22e7.HXpQ0dM4sPFpyF7squOu1YKFXOs6JZO", null, null, "Manager" }
+                    { 1, 0, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "admin@restaurant.local", "System Admin", true, null, "$2a$11$QMyrjjsBLb7obUvnOtfbiu.H5O0IrMWVqsAOCG0OS4xuUkUsj/ct2", null, null, "Admin" },
+                    { 2, 0, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "kitchen@restaurant.local", "Kitchen Staff", true, null, "$2a$11$iXo607uYZzXx9Lves8pkEeihb0WrXiAYfO0ka./e1.hKTKt3T554W", null, null, "Kitchen" },
+                    { 3, 0, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "manager@restaurant.local", "Restaurant Manager", true, null, "$2a$11$GQqWprbnqdgn/88W318q1.CIMOKhOgJYQo9F.wij6ERJMS4H5hgve", null, null, "Manager" }
                 });
 
             migrationBuilder.InsertData(
@@ -254,16 +255,46 @@ namespace QServe.Migrations
                 columns: new[] { "ItemID", "CategoryID", "CreatedAt", "ImageUrl", "IsAvailable", "ItemType", "Name", "PrepTimeMinutes", "Price", "RecentOrdered", "TotalOrdered" },
                 values: new object[,]
                 {
-                    { 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), null, true, "Beverage", "Masala Chai", 5, 40m, 0, 0 },
-                    { 2, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), null, true, "Beverage", "Fresh Lime Soda", 5, 60m, 0, 0 },
-                    { 3, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), null, true, "Beverage", "Cold Coffee", 5, 90m, 0, 0 },
-                    { 4, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), null, true, "Quick", "Veg Spring Rolls", 10, 150m, 0, 0 },
-                    { 5, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), null, true, "Cooked", "Chicken Satay", 15, 220m, 0, 0 },
-                    { 6, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), null, true, "Cooked", "Paneer Butter Masala", 20, 260m, 0, 0 },
-                    { 7, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), null, true, "Cooked", "Chicken Biryani", 25, 320m, 0, 0 },
-                    { 8, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), null, true, "Cooked", "Grilled Fish", 22, 380m, 0, 0 },
-                    { 9, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), null, true, "Dessert", "Gulab Jamun", 5, 90m, 0, 0 },
-                    { 10, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), null, true, "Dessert", "Chocolate Brownie", 8, 140m, 0, 0 }
+                    { 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=500&auto=format&fit=crop&q=60", true, "Beverage", "Masala Chai", 5, 40m, 0, 0 },
+                    { 2, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500&auto=format&fit=crop&q=60", true, "Beverage", "Fresh Lime Soda", 5, 60m, 0, 0 },
+                    { 3, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=500&auto=format&fit=crop&q=60", true, "Beverage", "Cold Coffee", 5, 90m, 0, 0 },
+                    { 4, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=60", true, "Quick", "Veg Spring Rolls", 10, 150m, 0, 0 },
+                    { 5, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Chicken Satay", 15, 220m, 0, 0 },
+                    { 6, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Paneer Butter Masala", 20, 260m, 0, 0 },
+                    { 7, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Chicken Biryani", 25, 320m, 0, 0 },
+                    { 8, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Grilled Fish", 22, 380m, 0, 0 },
+                    { 9, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1527786356703-4b100091cd2c?w=500&auto=format&fit=crop&q=60", true, "Dessert", "Gulab Jamun", 5, 90m, 0, 0 },
+                    { 10, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=500&auto=format&fit=crop&q=60", true, "Dessert", "Chocolate Brownie", 8, 140m, 0, 0 },
+                    { 11, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=500&auto=format&fit=crop&q=60", true, "Beverage", "Mango Juice", 5, 80m, 0, 0 },
+                    { 12, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=500&auto=format&fit=crop&q=60", true, "Beverage", "Watermelon Juice", 5, 70m, 0, 0 },
+                    { 13, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&auto=format&fit=crop&q=60", true, "Beverage", "Iced Tea", 5, 75m, 0, 0 },
+                    { 14, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=60", true, "Quick", "French Fries", 10, 120m, 0, 0 },
+                    { 15, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=60", true, "Quick", "Veg Burger", 12, 160m, 0, 0 },
+                    { 16, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=500&auto=format&fit=crop&q=60", true, "Quick", "Chicken Burger", 15, 190m, 0, 0 },
+                    { 17, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1562967914-608f82629710?w=500&auto=format&fit=crop&q=60", true, "Quick", "Chicken Nuggets", 12, 180m, 0, 0 },
+                    { 18, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Veg Fried Rice", 18, 180m, 0, 0 },
+                    { 19, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Chicken Fried Rice", 20, 240m, 0, 0 },
+                    { 20, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1552611052-33e04de081de?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Veg Noodles", 15, 170m, 0, 0 },
+                    { 22, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Butter Chicken", 25, 340m, 0, 0 },
+                    { 23, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=500&auto=format&fit=crop&q=60", true, "Dessert", "Chocolate Ice Cream", 3, 110m, 0, 0 },
+                    { 24, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=500&auto=format&fit=crop&q=60", true, "Dessert", "Vanilla Ice Cream", 3, 100m, 0, 0 },
+                    { 25, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=500&auto=format&fit=crop&q=60", true, "Dessert", "Cheesecake", 8, 180m, 0, 0 },
+                    { 26, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1523677011781-c91d1bbe2f9e?w=500&auto=format&fit=crop&q=60", true, "Beverage", "Masala Buttermilk", 3, 50m, 0, 0 },
+                    { 27, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1626201850125-18d2d9a17c5b?w=500&auto=format&fit=crop&q=60", true, "Beverage", "Sweet Lassi", 5, 80m, 0, 0 },
+                    { 28, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=500&auto=format&fit=crop&q=60", true, "Beverage", "Mango Lassi", 5, 100m, 0, 0 },
+                    { 29, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=500&auto=format&fit=crop&q=60", true, "Quick", "Samosa", 8, 60m, 0, 0 },
+                    { 30, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=500&auto=format&fit=crop&q=60", true, "Quick", "Paneer Tikka", 15, 220m, 0, 0 },
+                    { 31, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=500&auto=format&fit=crop&q=60", true, "Quick", "Chicken 65", 15, 240m, 0, 0 },
+                    { 32, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1625944525533-473f1a3d54e7?w=500&auto=format&fit=crop&q=60", true, "Quick", "Vegetable Pakora", 10, 100m, 0, 0 },
+                    { 33, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1601050690117-94f5f6fa8bd5?w=500&auto=format&fit=crop&q=60", true, "Quick", "Kerala Parotta", 5, 20m, 0, 0 },
+                    { 34, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Kadai Paneer", 20, 280m, 0, 0 },
+                    { 35, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1596797038530-2c107229654b?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Palak Paneer", 20, 260m, 0, 0 },
+                    { 36, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Chicken Curry", 25, 280m, 0, 0 },
+                    { 37, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1625944525945-7d8b40f95f69?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Kerala Fish Curry", 25, 300m, 0, 0 },
+                    { 38, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1545247181-516773cae754?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Mutton Rogan Josh", 30, 420m, 0, 0 },
+                    { 39, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=500&auto=format&fit=crop&q=60", true, "Cooked", "Appam with Chicken Stew", 20, 250m, 0, 0 },
+                    { 40, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=500&auto=format&fit=crop&q=60", true, "Dessert", "Payasam", 5, 100m, 0, 0 },
+                    { 41, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "https://images.unsplash.com/photo-1571115764595-644a1f56a55c?w=500&auto=format&fit=crop&q=60", true, "Dessert", "Rasgulla", 5, 90m, 0, 0 }
                 });
 
             migrationBuilder.CreateIndex(
@@ -300,8 +331,7 @@ namespace QServe.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_Payments_OrderID",
                 table: "Payments",
-                column: "OrderID",
-                unique: true);
+                column: "OrderID");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Payments_VerifiedBy",

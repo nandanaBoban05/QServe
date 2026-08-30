@@ -8,7 +8,6 @@ using QServe.Hubs;
 using QServe.Models;
 using QServe.Services;
 using QServe.ViewModels;
-
 namespace QServe.Controllers;
 
 // AUTH-6: role checks enforced server-side via [Authorize], not just hidden UI links.
@@ -474,8 +473,10 @@ public class AdminController : Controller
             .Take(pageSize)
             .ToListAsync();
 
-        var baseUrl = _config["App:BaseUrl"]?.TrimEnd('/')
-            ?? $"{Request.Scheme}://{Request.Host}";
+        var configuredBaseUrl = _config["App:BaseUrl"];
+        var baseUrl = !string.IsNullOrWhiteSpace(configuredBaseUrl) && !configuredBaseUrl.Contains("localhost", StringComparison.OrdinalIgnoreCase)
+            ? configuredBaseUrl.TrimEnd('/')
+            : $"{Request.Scheme}://{Request.Host}";
 
         filter.Tables = new PagedResult<RestaurantTable>
         {

@@ -1,7 +1,18 @@
 @{
-    var width = ViewData["LogoWidth"] ?? "36";
-    var height = ViewData["LogoHeight"] ?? "36";
+    // The source file (wwwroot/images/qserve_logo.png) is a fixed 905×314px horizontal
+    // lockup — icon + "QServe" wordmark side-by-side — aspect ratio ≈ 2.882:1.
+    //
+    // Height is ALWAYS derived from width now, so the logo can never be stretched or
+    // squished again, no matter what a page passes. "LogoHeight" is intentionally no
+    // longer read — several pages were passing near-square values (52x52, 100x100, etc.)
+    // that squished this wide logo into a distorted squat version of itself.
+    const double aspectRatio = 905.0 / 314.0; // ≈ 2.8822
+
+    var widthRaw = ViewData["LogoWidth"]?.ToString() ?? "140";
+    var width = double.TryParse(widthRaw, out var w) ? w : 140;
+    var height = Math.Round(width / aspectRatio, 1);
+
     var cssClass = ViewData["LogoClass"] ?? "brand-logo";
-    var alt = ViewData["LogoAlt"] ?? "QServe Logo";
+    var alt = ViewData["LogoAlt"] ?? "QServe";
 }
-<img src="~/images/qserve_logo.png" alt="@alt" width="@width" height="@height" class="@cssClass" />
+<img src="~/images/qserve_logo.png" alt="@alt" width="@width.ToString("0.##")" height="@height.ToString("0.##")" class="@cssClass" />

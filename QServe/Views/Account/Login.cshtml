@@ -2,10 +2,51 @@
     ViewData["Title"] = "Staff Login";
 }
 
+<style>
+    .password-field {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+        .password-field input {
+            flex: 1;
+            padding-right: 42px;
+        }
+
+    .password-toggle {
+        position: absolute;
+        right: 10px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--on-surface-muted);
+        padding: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+    }
+
+        .password-toggle:hover {
+            color: var(--on-surface);
+        }
+
+    .eye-icon {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+</style>
+
 <div class="page page--auth">
     <div class="auth-card" style="text-align:center;">
         <div style="margin:0 auto 14px; display:inline-block;">
-            <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "68" }, { "LogoHeight", "68" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
+            <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "180" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
         </div>
         <h1 class="headline-md" style="margin-bottom:2px;">QServe</h1>
         <span class="eyebrow" style="margin-bottom:24px;">Smart Restaurant Management</span>
@@ -38,7 +79,13 @@
 
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" name="password" placeholder="••••••••" required />
+                    <div class="password-field">
+                        <input type="password" id="password" name="password" placeholder="••••••••" required />
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password', this)" aria-label="Show password">
+                            <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                            <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                        </button>
+                    </div>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-block" style="padding:12px; margin-top:8px; font-size:15px; font-weight:600;">
@@ -54,3 +101,15 @@
         </div>
     </div>
 </div>
+
+<script>
+    function togglePasswordVisibility(fieldId, button) {
+        event.preventDefault();
+        const field = document.getElementById(fieldId);
+        const isPassword = field.type === 'password';
+        field.type = isPassword ? 'text' : 'password';
+        button.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+        button.querySelector('.eye-icon--open').style.display = isPassword ? 'none' : 'block';
+        button.querySelector('.eye-icon--closed').style.display = isPassword ? 'block' : 'none';
+    }
+</script>

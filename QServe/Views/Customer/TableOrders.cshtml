@@ -6,9 +6,16 @@
 
 <div class="ticket-shell">
     <div class="ticket-brand">
-        <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "120" }, { "LogoHeight", "60" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
+        <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "180" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
     </div>
-    <div class="ticket-topline">
+    <div class="ticket-topline" style="flex-wrap:wrap; row-gap:8px;">
+        <a href="@Url.Action("Menu", new { tableId })" class="back-button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Back
+        </a>
         <span class="table-stamp">TABLE @ViewBag.TableNumber</span>
         <a class="btn btn-ghost btn-sm" href="@Url.Action("Menu", new { tableId })">+ Add More</a>
     </div>
@@ -35,7 +42,8 @@
                             <div class="ticket-card__name mono" style="font-size:16px;">Order #@order.OrderID.ToString("D5")</div>
                             <div class="ticket-card__meta" style="margin-top:6px;">
                                 @{
-                                    string badgeClass = order.OrderStatus switch {
+                                    string badgeClass = order.OrderStatus switch
+                                    {
                                         "Approved" => "badge-approved",
                                         "Preparing" => "badge-preparing",
                                         "Ready" => "badge-ready",

@@ -215,6 +215,57 @@ public class AdminStaffController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(int userId)
+    {
+        var user = await _db.Users.FindAsync(userId);
+        if (user is null) return NotFound();
+
+        var currentAdminIdRaw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(currentAdminIdRaw, out var currentAdminId) && userId == currentAdminId)
+        {
+            TempData["StaffMessage"] = "You cannot delete your own account while logged in.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (user.IsActive && user.Role == UserRoles.Admin)
+        {
+            var activeAdminCount = await _db.Users.CountAsync(u => u.IsActive && u.Role == UserRoles.Admin);
+            if (activeAdminCount <= 1)
+            {
+                TempData["StaffMessage"] = "Cannot delete the last active Admin account.";
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        // Payment.VerifiedBy -> Users is configured with DeleteBehavior.Restrict, so deleting a
+        // user who has verified any cash/card payments would fail at the database level. Block
+        // it explicitly with a clear message instead of letting that exception surface.
+        var verifiedPaymentCount = await _db.Payments.CountAsync(p => p.VerifiedBy == userId);
+        if (verifiedPaymentCount > 0)
+        {
+            TempData["StaffMessage"] =
+                $"Cannot delete \"{user.FullName}\" — they have verified {verifiedPaymentCount} payment{(verifiedPaymentCount == 1 ? "" : "s")} on record. " +
+                "Deactivate the account instead to preserve that history.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var fullName = user.FullName;
+
+        // AuditLog.PerformedBy -> Users is configured with DeleteBehavior.SetNull, so this user's
+        // past audit log entries are preserved and simply lose their "performed by" reference —
+        // no guard needed for that relationship.
+        _db.Users.Remove(user);
+        await _db.SaveChangesAsync();
+
+        await WriteAuditLogAsync("Users", userId, "StaffAccountDeleted", null,
+            JsonSerializer.Serialize(new { FullName = fullName }));
+
+        TempData["StaffMessage"] = $"Staff account for {fullName} was permanently deleted.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ClearLockout(int userId)
     {
         var user = await _db.Users.FindAsync(userId);

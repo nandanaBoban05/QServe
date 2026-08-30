@@ -322,6 +322,35 @@ public class AdminMenuController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteItem(int itemId)
+    {
+        var item = await _db.MenuItems.FindAsync(itemId);
+        if (item is null) return NotFound();
+
+        // OrderItem.ItemID -> MenuItems is configured with DeleteBehavior.Restrict, so deleting
+        // an item that has ever been ordered would fail at the database level. Block it
+        // explicitly instead — past order/receipt history must stay intact.
+        var orderedCount = await _db.OrderItems.CountAsync(oi => oi.ItemID == itemId);
+        if (orderedCount > 0)
+        {
+            TempData["MenuError"] =
+                $"Cannot delete \"{item.Name}\" — it appears in {orderedCount} past order line{(orderedCount == 1 ? "" : "s")}. " +
+                "Mark it Unavailable instead to keep order history intact.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        DeleteMenuItemImageFile(item.ImageUrl);
+
+        _db.MenuItems.Remove(item);
+        await _db.SaveChangesAsync();
+
+        TempData["MenuSuccess"] = $"Menu item \"{item.Name}\" deleted.";
+        return RedirectToAction(nameof(Index));
+    }
+
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateCategory(string name, int displayOrder)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -347,6 +376,63 @@ public class AdminMenuController : Controller
         await _db.SaveChangesAsync();
 
         TempData["CategorySuccess"] = $"Category \"{trimmed}\" added.";
+        return RedirectToAction(nameof(Categories));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditCategory(int categoryId, string name, int displayOrder)
+    {
+        var category = await _db.MenuCategories.FindAsync(categoryId);
+        if (category is null) return NotFound();
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            TempData["CategoryError"] = "Category name is required.";
+            return RedirectToAction(nameof(Categories));
+        }
+
+        var trimmed = name.Trim();
+
+        // Exclude this category itself from the duplicate-name check so saving with an
+        // unchanged name doesn't false-positive against its own current row.
+        if (await _db.MenuCategories.AnyAsync(c => c.Name == trimmed && c.CategoryID != categoryId))
+        {
+            TempData["CategoryError"] = $"Category \"{trimmed}\" already exists.";
+            return RedirectToAction(nameof(Categories));
+        }
+
+        category.Name = trimmed;
+        category.DisplayOrder = displayOrder;
+        await _db.SaveChangesAsync();
+
+        TempData["CategorySuccess"] = $"Category \"{trimmed}\" updated.";
+        return RedirectToAction(nameof(Categories));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteCategory(int categoryId)
+    {
+        var category = await _db.MenuCategories.FindAsync(categoryId);
+        if (category is null) return NotFound();
+
+        // MenuItem.CategoryID is a required FK with no explicit delete behavior configured,
+        // so EF Core's default is cascade delete — removing a category with items would
+        // silently delete those items too. Block that explicitly instead.
+        var itemCount = await _db.MenuItems.CountAsync(i => i.CategoryID == categoryId);
+        if (itemCount > 0)
+        {
+            TempData["CategoryError"] =
+                $"Cannot delete \"{category.Name}\" — it still has {itemCount} menu item{(itemCount == 1 ? "" : "s")}. " +
+                "Move or delete those items first.";
+            return RedirectToAction(nameof(Categories));
+        }
+
+        _db.MenuCategories.Remove(category);
+        await _db.SaveChangesAsync();
+
+        TempData["CategorySuccess"] = $"Category \"{category.Name}\" deleted.";
         return RedirectToAction(nameof(Categories));
     }
 

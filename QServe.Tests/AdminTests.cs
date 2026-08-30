@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -19,6 +20,7 @@ public class AdminTests
     private readonly ApplicationDbContext _db;
     private readonly Mock<IQrCodeService> _qrCodeServiceMock = new();
     private readonly Mock<IPaymentService> _paymentServiceMock = new();
+    private readonly Mock<IWebHostEnvironment> _envMock = new();
     private readonly IConfiguration _config;
     private readonly AdminController _adminController;
     private readonly AdminMenuController _menuController;
@@ -42,7 +44,7 @@ public class AdminTests
         _qrCodeServiceMock.Setup(q => q.GenerateForTableAsync(It.IsAny<int>())).ReturnsAsync(new byte[] { 1, 2, 3 });
 
         _adminController = new AdminController(_db, _qrCodeServiceMock.Object, _paymentServiceMock.Object, _config);
-        _menuController = new AdminMenuController(_db);
+        _menuController = new AdminMenuController(_db, _envMock.Object);
         _staffController = new AdminStaffController(_db);
 
         // Setup HttpContext for controllers to support User claims & TempData
@@ -61,11 +63,9 @@ public class AdminTests
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var principal = new ClaimsPrincipal(identity);
-
         var httpContext = new DefaultHttpContext { User = principal };
         httpContext.Request.Scheme = "https";
         httpContext.Request.Host = new HostString("qserve.test");
-
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         controller.TempData = new TempDataDictionary(httpContext, Mock.Of<ITempDataProvider>());
     }
@@ -75,7 +75,6 @@ public class AdminTests
     {
         var table = new RestaurantTable { TableNumber = "T1", IsActive = true };
         _db.RestaurantTables.Add(table);
-
         _db.Orders.AddRange(
             new Order { Table = table, OrderStatus = OrderStatuses.Approved, TotalAmount = 150 },
             new Order { Table = table, OrderStatus = OrderStatuses.Preparing, TotalAmount = 200 },
@@ -99,7 +98,6 @@ public class AdminTests
     {
         var table = new RestaurantTable { TableNumber = "T1", IsActive = true };
         _db.RestaurantTables.Add(table);
-
         _db.Orders.AddRange(
             new Order { Table = table, OrderStatus = OrderStatuses.Approved, TotalAmount = 150 },
             new Order { Table = table, OrderStatus = OrderStatuses.Preparing, TotalAmount = 200 },
@@ -124,7 +122,6 @@ public class AdminTests
     {
         var table = new RestaurantTable { TableNumber = "T1", IsActive = true };
         _db.RestaurantTables.Add(table);
-
         for (int i = 1; i <= 25; i++)
         {
             _db.Orders.Add(new Order { Table = table, OrderStatus = OrderStatuses.Approved, TotalAmount = i * 10 });
@@ -187,11 +184,9 @@ public class AdminTests
     {
         var table = new RestaurantTable { TableNumber = "T1", IsActive = true };
         _db.RestaurantTables.Add(table);
-
         var order1 = new Order { Table = table, OrderStatus = OrderStatuses.Approved, TotalAmount = 500 };
         var order2 = new Order { Table = table, OrderStatus = OrderStatuses.PendingPayment, TotalAmount = 150 };
         var order3 = new Order { Table = table, OrderStatus = OrderStatuses.Cancelled, TotalAmount = 1000 };
-
         _db.Payments.AddRange(
             new Payment { Order = order1, Amount = 500, PaymentMode = PaymentModes.Online, PaymentStatus = PaymentStatuses.Received },
             new Payment { Order = order2, Amount = 150, PaymentMode = PaymentModes.Cash, PaymentStatus = PaymentStatuses.Pending },
@@ -243,7 +238,7 @@ public class AdminTests
         await _db.SaveChangesAsync();
 
         var invalidItem = new MenuItem { Name = "", Price = -10, CategoryID = category.CategoryID };
-        var result = await _menuController.CreateItem(invalidItem) as ViewResult;
+        var result = await _menuController.CreateItem(invalidItem, null) as ViewResult;
 
         Assert.NotNull(result);
         Assert.False(_menuController.ModelState.IsValid);

@@ -117,32 +117,40 @@
                             <span class="badge @(user.IsActive ? "badge-ready" : "badge-neutral")">
                                 @(user.IsActive ? "Active" : "Deactivated")
                             </span>
-                        </td>
-                        <td style="text-align:right; white-space:nowrap;">
-                            <a asp-action="Edit" asp-route-userId="@user.UserID" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:12px;">
-                                Edit
-                            </a>
-                            <a asp-action="ResetPassword" asp-route-userId="@user.UserID" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:12px;">
-                                Reset Password
-                            </a>
-                            @if (isLocked)
-                            {
-                                <form asp-action="ClearLockout" method="post" style="display:inline;">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="userId" value="@user.UserID" />
-                                    <button type="submit" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:12px; color:var(--status-ready-text);">
-                                        Unlock
-                                    </button>
-                                </form>
-                            }
-                            <form asp-action="ToggleActive" method="post" style="display:inline;">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="userId" value="@user.UserID" />
-                                <button type="submit" class="btn btn-ghost btn-sm" style="padding:4px 8px;">
-                                    @(user.IsActive ? "Deactivate" : "Activate")
-                                </button>
-                            </form>
-                        </td>
+                                </td>
+                                <td style="text-align:right; white-space:nowrap;">
+                                    <a asp-action="Edit" asp-route-userId="@user.UserID" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:12px;">
+                                        Edit
+                                    </a>
+                                    <a asp-action="ResetPassword" asp-route-userId="@user.UserID" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:12px;">
+                                        Reset Password
+                                    </a>
+                                    @if (isLocked)
+                                    {
+                                        <form asp-action="ClearLockout" method="post" style="display:inline;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="userId" value="@user.UserID" />
+                                            <button type="submit" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:12px; color:var(--status-ready-text);">
+                                                Unlock
+                                            </button>
+                                        </form>
+                                    }
+                                    <form asp-action="ToggleActive" method="post" style="display:inline;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="userId" value="@user.UserID" />
+                                        <button type="submit" class="btn btn-ghost btn-sm" style="padding:4px 8px;">
+                                            @(user.IsActive ? "Deactivate" : "Activate")
+                                        </button>
+                                    </form>
+                                    <form asp-action="Delete" method="post" style="display:inline;"
+                                          onsubmit="return confirm('Permanently delete the account for &quot;@user.FullName&quot;? This cannot be undone.');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="userId" value="@user.UserID" />
+                                        <button type="submit" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:12px; color:var(--error); border-color:#fecaca;">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </td>
                     </tr>
                 }
                 </tbody>

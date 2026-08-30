@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using QServe.Data;
 using QServe.Hubs;
@@ -13,6 +14,11 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // MVC + Razor Views
 builder.Services.AddControllersWithViews();
+
+// Needed so services (QrCodeService, PasswordResetService, EmailTemplateService) can read
+// the current request's scheme/host to build URLs when App:BaseUrl isn't explicitly set —
+// this is what lets QR/reset/email links automatically match a Dev Tunnel URL.
+builder.Services.AddHttpContextAccessor();
 
 // ---- Module 2: Authentication & RBAC ----
 // Custom cookie auth backed directly by the Users table (see Services/AuthService.cs)
@@ -99,6 +105,23 @@ builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
+// Must run in Development too — ASP.NET Core Dev Tunnels route traffic through a relay
+// that sets X-Forwarded-Proto/X-Forwarded-Host, and code that reads Request.Scheme/
+// Request.Host (QrCodeService, AdminController.Tables, etc.) depends on this being
+// processed BEFORE those reads happen. XForwardedHost is added (the original block only
+// forwarded For+Proto) because the tunnel's public hostname differs from Kestrel's local
+// binding. KnownNetworks/KnownProxies are cleared because they default to loopback-only,
+// and the Dev Tunnel relay isn't a loopback address.
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+        | ForwardedHeaders.XForwardedHost
+};
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
+
 if (!app.Environment.IsDevelopment())
 {
     // Fail-fast configuration validation
@@ -114,15 +137,10 @@ if (!app.Environment.IsDevelopment())
     if (string.IsNullOrWhiteSpace(dbConn))
         throw new InvalidOperationException("ConnectionStrings:DefaultConnection is missing.");
 
-    if (string.IsNullOrWhiteSpace(app.Configuration["Razorpay:KeyId"]) || 
-        string.IsNullOrWhiteSpace(app.Configuration["Razorpay:KeySecret"]) || 
+    if (string.IsNullOrWhiteSpace(app.Configuration["Razorpay:KeyId"]) ||
+        string.IsNullOrWhiteSpace(app.Configuration["Razorpay:KeySecret"]) ||
         string.IsNullOrWhiteSpace(app.Configuration["Razorpay:WebhookSecret"]))
         throw new InvalidOperationException("Razorpay configuration (KeyId, KeySecret, WebhookSecret) is incomplete.");
-
-    app.UseForwardedHeaders(new ForwardedHeadersOptions
-    {
-        ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
-    });
 
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();

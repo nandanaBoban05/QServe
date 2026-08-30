@@ -24,6 +24,7 @@ public class AccountSecurityTests
     private readonly Mock<IEmailTemplateService> _templateServiceMock = new();
     private readonly Mock<IConfiguration> _configMock = new();
     private readonly Mock<IWebHostEnvironment> _envMock = new();
+    private readonly Mock<IHttpContextAccessor> _httpContextAccessorMock = new();
     private readonly Mock<ILogger<PasswordResetService>> _loggerMock = new();
 
     public AccountSecurityTests()
@@ -40,13 +41,14 @@ public class AccountSecurityTests
 
         _authService = new AuthService(_db);
         _passwordResetService = new PasswordResetService(
-            _db,
-            _emailSenderMock.Object,
-            _templateServiceMock.Object,
-            _configMock.Object,
-            _envMock.Object,
-            _loggerMock.Object);
-    }
+                _db,
+                _emailSenderMock.Object,
+                _templateServiceMock.Object,
+                _configMock.Object,
+                _envMock.Object,
+                _loggerMock.Object,
+                _httpContextAccessorMock.Object);
+                }
 
     [Fact]
     public async Task ValidateLogin_WithValidCredentials_ReturnsSuccess()

@@ -29,6 +29,12 @@
             <span style="font-size:13.5px; color:var(--status-ready-text); font-weight:500;">@successMessage</span>
         </div>
     }
+    @if (TempData["MenuError"] is string errorMessage)
+    {
+        <div class="card" style="background:#fef2f2; border-color:#fee2e2; padding:12px 16px; margin-bottom:16px;">
+            <span style="font-size:13.5px; color:var(--error); font-weight:500;">@errorMessage</span>
+        </div>
+    }
 
     <!-- Standardized Filter Card -->
     <div class="filter-card">
@@ -129,18 +135,26 @@
                                 @(item.IsAvailable ? "Available" : "Unavailable")
                             </span>
                         </td>
-                        <td style="text-align:right; white-space:nowrap;">
-                            <form asp-action="ToggleAvailability" method="post" style="display:inline;">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="itemId" value="@item.ItemID" />
-                                <button type="submit" class="btn btn-ghost btn-sm" style="padding:4px 8px;">
-                                    @(item.IsAvailable ? "Mark Unavailable" : "Mark Available")
-                                </button>
-                            </form>
-                            <a asp-action="EditItem" asp-route-itemId="@item.ItemID" class="btn btn-outline btn-sm" style="padding:4px 10px;">
-                                Edit
-                            </a>
-                        </td>
+                                <td style="text-align:right; white-space:nowrap;">
+                                    <form asp-action="ToggleAvailability" method="post" style="display:inline;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="itemId" value="@item.ItemID" />
+                                        <button type="submit" class="btn btn-ghost btn-sm" style="padding:4px 8px;">
+                                            @(item.IsAvailable ? "Mark Unavailable" : "Mark Available")
+                                        </button>
+                                    </form>
+                                    <a asp-action="EditItem" asp-route-itemId="@item.ItemID" class="btn btn-outline btn-sm" style="padding:4px 10px;">
+                                        Edit
+                                    </a>
+                                    <form asp-action="DeleteItem" method="post" style="display:inline;"
+                                          onsubmit="return confirm('Permanently delete &quot;@item.Name&quot;? This cannot be undone.');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="itemId" value="@item.ItemID" />
+                                        <button type="submit" class="btn btn-outline btn-sm" style="padding:4px 10px; color:var(--error); border-color:#fecaca;">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </td>
                     </tr>
                 }
                 </tbody>

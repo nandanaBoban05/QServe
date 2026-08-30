@@ -6,9 +6,28 @@
 }
 
 <div class="ticket-shell" style="text-align:center;">
-    <div class="ticket-brand">
-        <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "130" }, { "LogoHeight", "50" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
-    </div>
+    <div class="ticket-shell" style="text-align:center;">
+        <div class="back-nav-row" style="justify-content:flex-start; text-align:left;">
+            @{
+                int sessionOrderCount = (int)(ViewBag.SessionOrderCount ?? 0);
+                var backUrl = sessionOrderCount > 1
+                    ? Url.Action("TableOrders", new { tableId = Model.TableID })
+                    : Url.Action("Menu", new { tableId = Model.TableID });
+                var backLabel = sessionOrderCount > 1 ? "Back to Your Orders" : "Back to Menu";
+            }
+            <a href="@backUrl" class="back-button">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                @backLabel
+            </a>
+        </div>
+
+        <div class="ticket-brand">
+            <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "180" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
+        </div>
+
     <span class="eyebrow">Order Confirmation</span>
     <h1 class="mono" style="font-size:30px; margin:4px 0; font-weight:800; color:var(--on-surface);">#@Model.OrderID.ToString("D5")</h1>
     <p class="text-muted mono" style="font-size:13.5px; margin-top:-2px; margin-bottom:20px;">

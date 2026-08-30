@@ -890,3 +890,37 @@
         font-size: 19px;
     }
 }
+
+/* ---- Back navigation button (Status / TableOrders headers) ---- */
+.back-nav-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-family);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--on-surface-variant);
+    text-decoration: none;
+    padding: 7px 14px 7px 10px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--outline-subtle);
+    background-color: var(--surface-container-lowest);
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+    .back-button:hover {
+        color: var(--primary);
+        border-color: var(--primary-container);
+        background-color: var(--surface-container-low);
+    }
+
+    .back-button svg {
+        flex-shrink: 0;
+    }
