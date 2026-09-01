@@ -514,6 +514,10 @@ public class AdminController : Controller
         if (table is null) return NotFound();
 
         await _qrCodeService.GenerateForTableAsync(tableId);
+
+        await WriteAuditLogAsync("RestaurantTables", tableId, "TableQrRegenerated", null,
+            JsonSerializer.Serialize(new { table.TableNumber }));
+
         TempData["TableSuccess"] = $"QR Code regenerated for Table {table.TableNumber}.";
         return RedirectToAction(nameof(Tables));
     }
@@ -547,6 +551,9 @@ public class AdminController : Controller
         _db.RestaurantTables.Add(table);
         await _db.SaveChangesAsync();
 
+        await WriteAuditLogAsync("RestaurantTables", table.TableID, "TableCreated", null,
+            JsonSerializer.Serialize(new { table.TableNumber, table.Capacity, table.IsActive }));
+
         TempData["TableSuccess"] = $"Table \"{table.TableNumber}\" added.";
         return RedirectToAction(nameof(Tables));
     }
@@ -558,11 +565,34 @@ public class AdminController : Controller
         var table = await _db.RestaurantTables.FindAsync(tableId);
         if (table is null) return NotFound();
 
+        var wasActive = table.IsActive;
         table.IsActive = !table.IsActive;
         await _db.SaveChangesAsync();
 
+        await WriteAuditLogAsync("RestaurantTables", table.TableID, "TableStatusToggled",
+            JsonSerializer.Serialize(new { IsActive = wasActive }),
+            JsonSerializer.Serialize(new { IsActive = table.IsActive }));
+
         TempData["TableSuccess"] = $"Table \"{table.TableNumber}\" is now {(table.IsActive ? "Active" : "Inactive")}.";
         return RedirectToAction(nameof(Tables));
+    }
+
+    private async Task WriteAuditLogAsync(string entityType, int entityId, string action, string? oldValue = null, string? newValue = null)
+    {
+        var adminUserIdRaw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int? performedBy = int.TryParse(adminUserIdRaw, out var id) ? id : null;
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            EntityType = entityType,
+            EntityID = entityId,
+            Action = action,
+            OldValue = oldValue,
+            NewValue = newValue,
+            PerformedBy = performedBy,
+            Timestamp = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
     }
 
     // ---- Module 5: Payment Processing (admin-side verification queue) ----

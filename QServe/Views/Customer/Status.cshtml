@@ -400,12 +400,16 @@
         }
     });
 
-    connection.start().catch(err => {
-        console.error("SignalR connection failed, falling back to one-time sync:", err);
-        fetch(`/order/status/${currentOrderId}/json`)
-            .then(res => res.ok ? res.json() : null)
-            .then(data => { if (data && data.status) applyStatus(data.status); });
-    });
+    connection.start()
+        .then(() => {
+            connection.invoke("JoinOrderGroup", currentOrderId).catch(err => console.error("Error joining order group:", err));
+        })
+        .catch(err => {
+            console.error("SignalR connection failed, falling back to one-time sync:", err);
+            fetch(`/order/status/${currentOrderId}/json`)
+                .then(res => res.ok ? res.json() : null)
+                .then(data => { if (data && data.status) applyStatus(data.status); });
+        });
 </script>
 
 @functions {

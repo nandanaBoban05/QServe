@@ -1,9 +1,13 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using QServe.Data;
 using QServe.Hubs;
+using QServe.Models;
+using QServe.Repositories;
+using QServe.Repositories.Interfaces;
 using QServe.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,9 +24,21 @@ builder.Services.AddControllersWithViews();
 // this is what lets QR/reset/email links automatically match a Dev Tunnel URL.
 builder.Services.AddHttpContextAccessor();
 
-// ---- Module 2: Authentication & RBAC ----
-// Custom cookie auth backed directly by the Users table (see Services/AuthService.cs)
-// rather than full ASP.NET Core Identity, since the schema is bespoke to this project.
+// ---- Module 2: Authentication & RBAC (ASP.NET Core Identity) ----
+builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
+{
+    options.Password.RequiredLength = 8;
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequireUppercase = false;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.User.RequireUniqueEmail = true;
+})
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultTokenProviders();
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Forgot Password (self-service). Uses GmailEmailSender when EmailConfig has real credentials;
@@ -40,6 +56,10 @@ builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 builder.Services.AddScoped<IQrCodeService, QrCodeService>();
 
+// ---- Repositories ----
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+
 // ---- Module 5: Payment Processing ----
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
@@ -55,36 +75,33 @@ builder.Services.AddHostedService<RecentOrderedRecalculationService>();
 // ---- Module 10: Reporting & Analytics ----
 builder.Services.AddScoped<IReportingService, ReportingService>();
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/Account/Login";
+    options.AccessDeniedPath = "/Account/AccessDenied";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.SlidingExpiration = true;
+    options.Events = new CookieAuthenticationEvents
     {
-        options.LoginPath = "/Account/Login";
-        options.AccessDeniedPath = "/Account/AccessDenied";
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Strict;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
-        options.SlidingExpiration = true;
-        options.Events = new CookieAuthenticationEvents
+        OnValidatePrincipal = async context =>
         {
-            OnValidatePrincipal = async context =>
+            var userIdRaw = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(userIdRaw, out var userId))
             {
-                var userIdRaw = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                if (int.TryParse(userIdRaw, out var userId))
+                var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+                var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+                if (user == null || !user.IsActive)
                 {
-                    var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
-                    var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserID == userId);
-                    if (user == null || !user.IsActive)
-                    {
-                        context.RejectPrincipal();
-                        await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                    }
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
                 }
             }
-        };
-    });
-
-builder.Services.AddAuthorization();
+        }
+    };
+});
 
 // ---- Module 4: Customer Ordering ----
 // Session-based cart storage — there's no persistent customer identity (no login), so the

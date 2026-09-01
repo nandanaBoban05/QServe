@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +12,7 @@ namespace QServe.Controllers;
 /// <summary>
 /// Module 8: menu management (ADM-1/ADM-2). Split out from AdminController to keep each
 /// controller focused — this one owns MenuCategories and MenuItems only.
+/// Includes full audit logging for Menu creation, updates, deletion, and availability toggles.
 /// </summary>
 [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Manager}")]
 public class AdminMenuController : Controller
@@ -26,9 +29,6 @@ public class AdminMenuController : Controller
     private static readonly string[] AllowedImageExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
     private const long MaxImageBytes = 5 * 1024 * 1024; // 5 MB
 
-    /// <summary>Saves an uploaded menu item image to wwwroot/images/menu-items and returns
-    /// the relative URL to store in MenuItem.ImageUrl. Returns (true, null, null) if no
-    /// file was provided — that's not an error, it just means "leave the image as-is".</summary>
     private async Task<(bool Success, string? RelativeUrl, string? Error)> SaveMenuItemImageAsync(IFormFile? imageFile)
     {
         if (imageFile is null || imageFile.Length == 0)
@@ -42,7 +42,7 @@ public class AdminMenuController : Controller
             return (false, null, "Image must be smaller than 5 MB.");
 
         var folder = Path.Combine(_env.WebRootPath, "images", "menu-items");
-        Directory.CreateDirectory(folder); // creates it on first run if it doesn't already exist
+        Directory.CreateDirectory(folder);
 
         var fileName = $"{Guid.NewGuid():N}{extension}";
         var filePath = Path.Combine(folder, fileName);
@@ -55,9 +55,6 @@ public class AdminMenuController : Controller
         return (true, $"/images/menu-items/{fileName}", null);
     }
 
-    /// <summary>Deletes a previously-uploaded menu item image file, if there is one. Only ever
-    /// touches files under images/menu-items — an item whose ImageUrl is some other external
-    /// URL (e.g. from before this change) is left alone.</summary>
     private void DeleteMenuItemImageFile(string? relativeUrl)
     {
         if (string.IsNullOrWhiteSpace(relativeUrl) || !relativeUrl.StartsWith("/images/menu-items/"))
@@ -70,7 +67,6 @@ public class AdminMenuController : Controller
             System.IO.File.Delete(filePath);
         }
     }
-
 
     // ---- Menu Items ----
 
@@ -130,8 +126,6 @@ public class AdminMenuController : Controller
         return View(filter);
     }
 
-    // ADM-2: real-time-ish availability toggle — reflected on the customer menu on its next
-    // page load (Module 4 queries IsAvailable directly, no caching layer to invalidate).
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ToggleAvailability(int itemId)
@@ -139,8 +133,13 @@ public class AdminMenuController : Controller
         var item = await _db.MenuItems.FindAsync(itemId);
         if (item is null) return NotFound();
 
+        var wasAvailable = item.IsAvailable;
         item.IsAvailable = !item.IsAvailable;
         await _db.SaveChangesAsync();
+
+        await WriteAuditLogAsync("MenuItems", item.ItemID, "MenuItemAvailabilityToggled",
+            JsonSerializer.Serialize(new { IsAvailable = wasAvailable }),
+            JsonSerializer.Serialize(new { IsAvailable = item.IsAvailable }));
 
         TempData["MenuSuccess"] = $"\"{item.Name}\" is now {(item.IsAvailable ? "Available" : "Unavailable")}.";
         return RedirectToAction(nameof(Index));
@@ -183,8 +182,6 @@ public class AdminMenuController : Controller
             return View(item);
         }
 
-        // Only attempt the upload once the rest of the form is valid, so we don't write an
-        // orphaned file to disk for a submission that's about to be redisplayed anyway.
         var (imageSaved, imageUrl, imageError) = await SaveMenuItemImageAsync(imageFile);
         if (!imageSaved)
         {
@@ -201,6 +198,9 @@ public class AdminMenuController : Controller
 
         _db.MenuItems.Add(item);
         await _db.SaveChangesAsync();
+
+        await WriteAuditLogAsync("MenuItems", item.ItemID, "MenuItemCreated", null,
+            JsonSerializer.Serialize(new { item.Name, item.Price, item.CategoryID, item.ItemType, item.IsAvailable }));
 
         TempData["MenuSuccess"] = $"Menu item \"{item.Name}\" created.";
         return RedirectToAction(nameof(Index));
@@ -247,9 +247,11 @@ public class AdminMenuController : Controller
         {
             await PopulateCategoriesAsync();
             updated.ItemID = itemId;
-            updated.ImageUrl = item.ImageUrl; // keep showing the existing preview on validation failure
+            updated.ImageUrl = item.ImageUrl;
             return View(updated);
         }
+
+        var oldValues = JsonSerializer.Serialize(new { item.Name, item.CategoryID, item.Price, item.PrepTimeMinutes, item.ItemType });
 
         var newImageUrl = item.ImageUrl;
         if (imageFile is not null && imageFile.Length > 0)
@@ -264,7 +266,7 @@ public class AdminMenuController : Controller
                 return View(updated);
             }
 
-            DeleteMenuItemImageFile(item.ImageUrl); // remove the old file now that the new one is saved
+            DeleteMenuItemImageFile(item.ImageUrl);
             newImageUrl = imageUrl;
         }
 
@@ -276,7 +278,40 @@ public class AdminMenuController : Controller
         item.ImageUrl = newImageUrl;
 
         await _db.SaveChangesAsync();
+
+        await WriteAuditLogAsync("MenuItems", item.ItemID, "MenuItemUpdated", oldValues,
+            JsonSerializer.Serialize(new { item.Name, item.CategoryID, item.Price, item.PrepTimeMinutes, item.ItemType }));
+
         TempData["MenuSuccess"] = $"Menu item \"{item.Name}\" updated.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteItem(int itemId)
+    {
+        var item = await _db.MenuItems.FindAsync(itemId);
+        if (item is null) return NotFound();
+
+        var orderedCount = await _db.OrderItems.CountAsync(oi => oi.ItemID == itemId);
+        if (orderedCount > 0)
+        {
+            TempData["MenuError"] =
+                $"Cannot delete \"{item.Name}\" — it appears in {orderedCount} past order line{(orderedCount == 1 ? "" : "s")}. " +
+                "Mark it Unavailable instead to keep order history intact.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        DeleteMenuItemImageFile(item.ImageUrl);
+
+        var itemName = item.Name;
+        _db.MenuItems.Remove(item);
+        await _db.SaveChangesAsync();
+
+        await WriteAuditLogAsync("MenuItems", itemId, "MenuItemDeleted",
+            JsonSerializer.Serialize(new { Name = itemName }), null);
+
+        TempData["MenuSuccess"] = $"Menu item \"{itemName}\" deleted.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -322,35 +357,6 @@ public class AdminMenuController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteItem(int itemId)
-    {
-        var item = await _db.MenuItems.FindAsync(itemId);
-        if (item is null) return NotFound();
-
-        // OrderItem.ItemID -> MenuItems is configured with DeleteBehavior.Restrict, so deleting
-        // an item that has ever been ordered would fail at the database level. Block it
-        // explicitly instead — past order/receipt history must stay intact.
-        var orderedCount = await _db.OrderItems.CountAsync(oi => oi.ItemID == itemId);
-        if (orderedCount > 0)
-        {
-            TempData["MenuError"] =
-                $"Cannot delete \"{item.Name}\" — it appears in {orderedCount} past order line{(orderedCount == 1 ? "" : "s")}. " +
-                "Mark it Unavailable instead to keep order history intact.";
-            return RedirectToAction(nameof(Index));
-        }
-
-        DeleteMenuItemImageFile(item.ImageUrl);
-
-        _db.MenuItems.Remove(item);
-        await _db.SaveChangesAsync();
-
-        TempData["MenuSuccess"] = $"Menu item \"{item.Name}\" deleted.";
-        return RedirectToAction(nameof(Index));
-    }
-
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateCategory(string name, int displayOrder)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -367,13 +373,18 @@ public class AdminMenuController : Controller
             return RedirectToAction(nameof(Categories));
         }
 
-        _db.MenuCategories.Add(new MenuCategory
+        var category = new MenuCategory
         {
             Name = trimmed,
             DisplayOrder = displayOrder,
             IsActive = true
-        });
+        };
+
+        _db.MenuCategories.Add(category);
         await _db.SaveChangesAsync();
+
+        await WriteAuditLogAsync("MenuCategories", category.CategoryID, "MenuCategoryCreated", null,
+            JsonSerializer.Serialize(new { category.Name, category.DisplayOrder, category.IsActive }));
 
         TempData["CategorySuccess"] = $"Category \"{trimmed}\" added.";
         return RedirectToAction(nameof(Categories));
@@ -394,17 +405,20 @@ public class AdminMenuController : Controller
 
         var trimmed = name.Trim();
 
-        // Exclude this category itself from the duplicate-name check so saving with an
-        // unchanged name doesn't false-positive against its own current row.
         if (await _db.MenuCategories.AnyAsync(c => c.Name == trimmed && c.CategoryID != categoryId))
         {
             TempData["CategoryError"] = $"Category \"{trimmed}\" already exists.";
             return RedirectToAction(nameof(Categories));
         }
 
+        var oldValues = JsonSerializer.Serialize(new { category.Name, category.DisplayOrder });
+
         category.Name = trimmed;
         category.DisplayOrder = displayOrder;
         await _db.SaveChangesAsync();
+
+        await WriteAuditLogAsync("MenuCategories", category.CategoryID, "MenuCategoryUpdated", oldValues,
+            JsonSerializer.Serialize(new { category.Name, category.DisplayOrder }));
 
         TempData["CategorySuccess"] = $"Category \"{trimmed}\" updated.";
         return RedirectToAction(nameof(Categories));
@@ -417,9 +431,6 @@ public class AdminMenuController : Controller
         var category = await _db.MenuCategories.FindAsync(categoryId);
         if (category is null) return NotFound();
 
-        // MenuItem.CategoryID is a required FK with no explicit delete behavior configured,
-        // so EF Core's default is cascade delete — removing a category with items would
-        // silently delete those items too. Block that explicitly instead.
         var itemCount = await _db.MenuItems.CountAsync(i => i.CategoryID == categoryId);
         if (itemCount > 0)
         {
@@ -429,10 +440,14 @@ public class AdminMenuController : Controller
             return RedirectToAction(nameof(Categories));
         }
 
+        var categoryName = category.Name;
         _db.MenuCategories.Remove(category);
         await _db.SaveChangesAsync();
 
-        TempData["CategorySuccess"] = $"Category \"{category.Name}\" deleted.";
+        await WriteAuditLogAsync("MenuCategories", categoryId, "MenuCategoryDeleted",
+            JsonSerializer.Serialize(new { Name = categoryName }), null);
+
+        TempData["CategorySuccess"] = $"Category \"{categoryName}\" deleted.";
         return RedirectToAction(nameof(Categories));
     }
 
@@ -443,8 +458,13 @@ public class AdminMenuController : Controller
         var category = await _db.MenuCategories.FindAsync(categoryId);
         if (category is null) return NotFound();
 
+        var wasActive = category.IsActive;
         category.IsActive = !category.IsActive;
         await _db.SaveChangesAsync();
+
+        await WriteAuditLogAsync("MenuCategories", category.CategoryID, "MenuCategoryStatusToggled",
+            JsonSerializer.Serialize(new { IsActive = wasActive }),
+            JsonSerializer.Serialize(new { IsActive = category.IsActive }));
 
         TempData["CategorySuccess"] = $"Category \"{category.Name}\" is now {(category.IsActive ? "Active" : "Hidden")}.";
         return RedirectToAction(nameof(Categories));
@@ -456,5 +476,23 @@ public class AdminMenuController : Controller
             .Where(c => c.IsActive)
             .OrderBy(c => c.DisplayOrder)
             .ToListAsync();
+    }
+
+    private async Task WriteAuditLogAsync(string entityType, int entityId, string action, string? oldValue = null, string? newValue = null)
+    {
+        var adminUserIdRaw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int? performedBy = int.TryParse(adminUserIdRaw, out var id) ? id : null;
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            EntityType = entityType,
+            EntityID = entityId,
+            Action = action,
+            OldValue = oldValue,
+            NewValue = newValue,
+            PerformedBy = performedBy,
+            Timestamp = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
     }
 }

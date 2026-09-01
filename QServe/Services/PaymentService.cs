@@ -6,23 +6,14 @@ using Microsoft.EntityFrameworkCore;
 using QServe.Data;
 using QServe.Hubs;
 using QServe.Models;
+using QServe.Repositories;
+using QServe.Repositories.Interfaces;
 
 namespace QServe.Services;
 
 /// <summary>
 /// Module 5: Payment Processing.
-///
-/// Talks to Razorpay via plain REST calls (Orders API) rather than the official SDK — this
-/// keeps the dependency footprint small and the behaviour easy to verify line-by-line.
-///
-/// No order in this system ever reaches OrderStatus=Approved except through this service.
-/// Customer Ordering (Module 4) only ever creates PendingPayment / AwaitingVerification orders.
-///
-/// Two independent paths can approve an Online order — ConfirmOnlinePaymentAsync (the
-/// checkout.js browser callback, fires first in the normal case) and HandleWebhookAsync (a
-/// true server-to-server webhook, the redundant safety net if the browser callback never
-/// arrives). Both funnel through ApproveOnlinePaymentAsync so the approval side-effects
-/// (classification, popularity counters, broadcast) only ever live in one place.
+/// Uses IOrderRepository and IPaymentRepository for Order and Payment data access.
 /// </summary>
 public class PaymentService : IPaymentService
 {
@@ -32,15 +23,26 @@ public class PaymentService : IPaymentService
     private readonly IOrderClassifier _orderClassifier;
     private readonly IRealtimeNotifier _realtime;
     private readonly IRecommendationService _recommendationService;
+    private readonly IOrderRepository _orderRepository;
+    private readonly IPaymentRepository _paymentRepository;
 
-    public PaymentService(ApplicationDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory,
-        IOrderClassifier orderClassifier, IRealtimeNotifier realtime, IRecommendationService recommendationService)
+    public PaymentService(
+        ApplicationDbContext db,
+        IConfiguration config,
+        IHttpClientFactory httpClientFactory,
+        IOrderClassifier orderClassifier,
+        IRealtimeNotifier realtime,
+        IRecommendationService recommendationService,
+        IOrderRepository? orderRepository = null,
+        IPaymentRepository? paymentRepository = null)
     {
         _db = db;
         _config = config;
         _orderClassifier = orderClassifier;
         _realtime = realtime;
         _recommendationService = recommendationService;
+        _orderRepository = orderRepository ?? new OrderRepository(db);
+        _paymentRepository = paymentRepository ?? new PaymentRepository(db);
         _http = httpClientFactory.CreateClient(nameof(PaymentService));
         _http.BaseAddress = new Uri("https://api.razorpay.com/v1/");
 
@@ -52,7 +54,7 @@ public class PaymentService : IPaymentService
 
     public async Task<RazorpayCheckoutInfo> InitiateOnlinePaymentAsync(int orderId)
     {
-        var order = await _db.Orders.Include(o => o.Payments).FirstOrDefaultAsync(o => o.OrderID == orderId)
+        var order = await _orderRepository.GetByIdWithPaymentsAsync(orderId)
             ?? throw new InvalidOperationException($"Order #{orderId} not found.");
 
         if (order.OrderStatus != OrderStatuses.PendingPayment)
@@ -94,7 +96,7 @@ public class PaymentService : IPaymentService
 
         payment.RazorpayOrderID = razorpayOrderId;
         payment.PaymentStatus = PaymentStatuses.Processing;
-        await _db.SaveChangesAsync();
+        await _orderRepository.SaveChangesAsync();
 
         return new RazorpayCheckoutInfo(
             RazorpayOrderId: razorpayOrderId,
@@ -107,8 +109,7 @@ public class PaymentService : IPaymentService
     public async Task<ConfirmResult> ConfirmOnlinePaymentAsync(
         int orderId, string razorpayOrderId, string razorpayPaymentId, string razorpaySignature)
     {
-        var order = await _db.Orders.Include(o => o.Payments).Include(o => o.Table)
-            .FirstOrDefaultAsync(o => o.OrderID == orderId);
+        var order = await _orderRepository.GetByIdWithTableAndPaymentsAsync(orderId);
         if (order?.Payment is null) return ConfirmResult.OrderNotFound;
 
         if (order.Payment.RazorpayOrderID != razorpayOrderId)
@@ -117,8 +118,6 @@ public class PaymentService : IPaymentService
         if (order.Payment.PaymentStatus == PaymentStatuses.Received)
             return ConfirmResult.AlreadyProcessed; // idempotent — don't re-approve on a duplicate callback
 
-        // PAY-2: Razorpay's standard checkout signature is
-        //   HMAC-SHA256(key_secret, razorpay_order_id + "|" + razorpay_payment_id)
         var keySecret = _config["Razorpay:KeySecret"]!;
         var payload = $"{razorpayOrderId}|{razorpayPaymentId}";
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(keySecret));
@@ -174,14 +173,11 @@ public class PaymentService : IPaymentService
         if (razorpayOrderId is null || razorpayPaymentId is null)
             return true;
 
-        var payment = await _db.Payments
-            .Include(p => p.Order).ThenInclude(o => o!.Table)
-            .FirstOrDefaultAsync(p => p.RazorpayOrderID == razorpayOrderId);
+        var payment = await _paymentRepository.GetByRazorpayOrderIdAsync(razorpayOrderId);
 
         if (payment?.Order is null || payment.PaymentStatus == PaymentStatuses.Received)
             return true;
 
-        // Server-side Amount Verification: Ensure captured amount matches the authoritative QServe order amount
         var capturedAmountInPaise = paymentEntity.TryGetProperty("amount", out var amtProp) && amtProp.TryGetInt64(out var amt)
             ? (long?)amt
             : null;
@@ -202,8 +198,7 @@ public class PaymentService : IPaymentService
 
     public async Task MarkOnlinePaymentFailedAsync(int orderId)
     {
-        var order = await _db.Orders.Include(o => o.Payments).Include(o => o.Table)
-            .FirstOrDefaultAsync(o => o.OrderID == orderId);
+        var order = await _orderRepository.GetByIdWithTableAndPaymentsAsync(orderId);
         if (order?.Payment is null) return;
 
         order.Payment.PaymentStatus = PaymentStatuses.Failed;
@@ -211,7 +206,7 @@ public class PaymentService : IPaymentService
         order.OrderStatus = OrderStatuses.PendingPayment;
 
         await WriteAuditLogAsync("Orders", order.OrderID, "OnlinePaymentFailed", null, null, performedBy: null);
-        await _db.SaveChangesAsync();
+        await _orderRepository.SaveChangesAsync();
 
         await _realtime.BroadcastOrderStatusUpdateAsync(new OrderStatusUpdateDto(
             order.OrderID, order.Table?.TableNumber ?? "", order.OrderStatus, DateTime.UtcNow));
@@ -219,8 +214,7 @@ public class PaymentService : IPaymentService
 
     public async Task AdminVerifyAsync(int paymentId, bool approve, int adminUserId, string? rejectionReason = null)
     {
-        var payment = await _db.Payments.Include(p => p.Order).ThenInclude(o => o!.Table)
-            .FirstOrDefaultAsync(p => p.PaymentID == paymentId)
+        var payment = await _paymentRepository.GetByIdWithOrderAndTableAsync(paymentId)
             ?? throw new InvalidOperationException($"Payment {paymentId} not found.");
 
         if (payment.Order is null)
@@ -250,7 +244,6 @@ public class PaymentService : IPaymentService
             payment.RejectionReason = string.IsNullOrWhiteSpace(rejectionReason) ? "Rejected by staff" : rejectionReason.Trim();
             payment.VerifiedBy = adminUserId;
             payment.VerificationTime = DateTime.UtcNow;
-            // Preserves the order, items, and total — transitions to PendingPayment to allow customer to pay again
             payment.Order.OrderStatus = OrderStatuses.PendingPayment;
         }
 
@@ -260,7 +253,7 @@ public class PaymentService : IPaymentService
             JsonSerializer.Serialize(new { OrderStatus = payment.Order.OrderStatus, RejectionReason = payment.RejectionReason }),
             adminUserId);
 
-        await _db.SaveChangesAsync();
+        await _paymentRepository.SaveChangesAsync();
 
         if (approve)
         {
@@ -278,11 +271,7 @@ public class PaymentService : IPaymentService
         if (paymentMode is not (PaymentModes.Online or PaymentModes.Cash or PaymentModes.Card))
             throw new ArgumentException("Invalid payment mode.", nameof(paymentMode));
 
-        var order = await _db.Orders
-            .Include(o => o.Table)
-            .Include(o => o.OrderItems).ThenInclude(oi => oi.Item)
-            .Include(o => o.Payments)
-            .FirstOrDefaultAsync(o => o.OrderID == orderId)
+        var order = await _orderRepository.GetByIdWithDetailsAsync(orderId)
             ?? throw new InvalidOperationException($"Order #{orderId} not found.");
 
         if (order.OrderStatus != OrderStatuses.PendingPayment)
@@ -290,7 +279,6 @@ public class PaymentService : IPaymentService
             throw new InvalidOperationException($"Order #{orderId} is {order.OrderStatus.ToLowerInvariant()} and can no longer be paid.");
         }
 
-        // Server-side recalculate and validate total and availability from database items
         var itemIds = order.OrderItems.Select(oi => oi.ItemID).ToList();
         var currentItems = await _db.MenuItems
             .Include(m => m.Category)
@@ -313,7 +301,6 @@ public class PaymentService : IPaymentService
         }
         order.TotalAmount = total;
 
-        // Create new Payment attempt, preserving previous payments as history
         var newPayment = new Payment
         {
             OrderID = order.OrderID,
@@ -333,7 +320,7 @@ public class PaymentService : IPaymentService
             JsonSerializer.Serialize(new { OrderID = order.OrderID, PaymentMode = paymentMode, Amount = total }),
             null);
 
-        await _db.SaveChangesAsync();
+        await _orderRepository.SaveChangesAsync();
 
         if (paymentMode != PaymentModes.Online)
         {
@@ -349,8 +336,7 @@ public class PaymentService : IPaymentService
 
     public async Task RefundAsync(int paymentId, int adminUserId)
     {
-        var payment = await _db.Payments.Include(p => p.Order)
-            .FirstOrDefaultAsync(p => p.PaymentID == paymentId)
+        var payment = await _paymentRepository.GetByIdWithOrderAsync(paymentId)
             ?? throw new InvalidOperationException($"Payment {paymentId} not found.");
 
         if (payment.PaymentStatus != PaymentStatuses.Received)
@@ -381,7 +367,7 @@ public class PaymentService : IPaymentService
             JsonSerializer.Serialize(new { PaymentStatus = payment.PaymentStatus }),
             adminUserId);
 
-        await _db.SaveChangesAsync();
+        await _paymentRepository.SaveChangesAsync();
 
         if (payment.Order != null)
         {
@@ -402,7 +388,7 @@ public class PaymentService : IPaymentService
 
         try
         {
-            var currentStatus = await _db.Payments.Where(p => p.PaymentID == payment.PaymentID).Select(p => p.PaymentStatus).FirstOrDefaultAsync();
+            var currentStatus = await _paymentRepository.GetPaymentStatusAsync(payment.PaymentID);
             if (currentStatus == PaymentStatuses.Received) return;
 
             payment.PaymentStatus = PaymentStatuses.Received;
@@ -414,7 +400,7 @@ public class PaymentService : IPaymentService
             await WriteAuditLogAsync("Orders", order.OrderID, auditAction, null,
                 JsonSerializer.Serialize(new { order.OrderStatus }), performedBy: null);
 
-            await _db.SaveChangesAsync();
+            await _paymentRepository.SaveChangesAsync();
             if (transaction != null) await transaction.CommitAsync();
         }
         finally

@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
@@ -43,14 +45,37 @@ public class AdminTests
         _qrCodeServiceMock.Setup(q => q.BuildToken(It.IsAny<int>())).Returns("mock_token_abc");
         _qrCodeServiceMock.Setup(q => q.GenerateForTableAsync(It.IsAny<int>())).ReturnsAsync(new byte[] { 1, 2, 3 });
 
+        var userManager = CreateUserManager(_db);
         _adminController = new AdminController(_db, _qrCodeServiceMock.Object, _paymentServiceMock.Object, _config);
         _menuController = new AdminMenuController(_db, _envMock.Object);
-        _staffController = new AdminStaffController(_db);
+        _staffController = new AdminStaffController(_db, userManager);
 
         // Setup HttpContext for controllers to support User claims & TempData
         SetupControllerContext(_adminController, "1", "Admin");
         SetupControllerContext(_menuController, "1", "Admin");
         SetupControllerContext(_staffController, "1", "Admin");
+    }
+
+    private static UserManager<User> CreateUserManager(ApplicationDbContext db)
+    {
+        var userStore = new Microsoft.AspNetCore.Identity.EntityFrameworkCore.UserStore<User, IdentityRole<int>, ApplicationDbContext, int>(db);
+        var passwordHasher = new PasswordHasher<User>();
+        var userOptions = new Microsoft.Extensions.Options.OptionsWrapper<IdentityOptions>(new IdentityOptions());
+
+        var userManager = new UserManager<User>(
+            userStore,
+            userOptions,
+            passwordHasher,
+            new IUserValidator<User>[] { new UserValidator<User>() },
+            new IPasswordValidator<User>[] { new PasswordValidator<User>() },
+            new UpperInvariantLookupNormalizer(),
+            new IdentityErrorDescriber(),
+            (IServiceProvider)null!,
+            Mock.Of<ILogger<UserManager<User>>>());
+
+        userManager.RegisterTokenProvider(TokenOptions.DefaultProvider, new EmailTokenProvider<User>());
+
+        return userManager;
     }
 
     private void SetupControllerContext(Controller controller, string userId, string role)

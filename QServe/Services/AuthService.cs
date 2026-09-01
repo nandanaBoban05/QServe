@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using QServe.Data;
 using QServe.Models;
@@ -6,19 +7,26 @@ namespace QServe.Services;
 
 public class AuthService : IAuthService
 {
-    private const int MaxFailedAttempts = 5;
-    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
-
+    private readonly UserManager<User> _userManager;
+    private readonly SignInManager<User> _signInManager;
     private readonly ApplicationDbContext _db;
 
-    public AuthService(ApplicationDbContext db)
+    public AuthService(
+        UserManager<User> userManager,
+        SignInManager<User> signInManager,
+        ApplicationDbContext db)
     {
+        _userManager = userManager;
+        _signInManager = signInManager;
         _db = db;
     }
 
     public async Task<LoginOutcome> ValidateLoginAsync(string email, string password)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            return new LoginOutcome(LoginResult.InvalidCredentials, null, null, null);
+
+        var user = await _userManager.FindByEmailAsync(email);
 
         // Per PRD AUTH-2: don't reveal whether the email exists — generic result either way.
         if (user is null)
@@ -27,52 +35,44 @@ public class AuthService : IAuthService
         if (!user.IsActive)
             return new LoginOutcome(LoginResult.AccountInactive, null, null, null);
 
-        if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
+        if (await _userManager.IsLockedOutAsync(user))
             return new LoginOutcome(LoginResult.AccountLocked, null, null, null);
 
-        bool passwordMatches = BCrypt.Net.BCrypt.Verify(password, user.PasswordHash);
+        var result = await _signInManager.CheckPasswordSignInAsync(user, password, lockoutOnFailure: true);
 
-        if (!passwordMatches)
+        if (result.Succeeded)
         {
-            user.AccessFailedCount++;
-            var lockedNow = false;
-            if (user.AccessFailedCount >= MaxFailedAttempts)
-            {
-                user.LockoutEnd = DateTime.UtcNow.Add(LockoutDuration);
-                lockedNow = true;
-            }
+            await _userManager.ResetAccessFailedCountAsync(user);
 
             _db.AuditLogs.Add(new AuditLog
             {
                 EntityType = "Users",
-                EntityID = user.UserID,
-                Action = lockedNow ? "AccountLocked" : "LoginFailed",
-                PerformedBy = null,
+                EntityID = user.Id,
+                Action = "LoginSuccess",
+                PerformedBy = user.Id,
                 Timestamp = DateTime.UtcNow
             });
 
             await _db.SaveChangesAsync();
 
-            return user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow
-                ? new LoginOutcome(LoginResult.AccountLocked, null, null, null)
-                : new LoginOutcome(LoginResult.InvalidCredentials, null, null, null);
+            return new LoginOutcome(LoginResult.Success, user.Id, user.Role, user.FullName);
         }
 
-        // Success — reset failed-attempt counter
-        user.AccessFailedCount = 0;
-        user.LockoutEnd = null;
+        var isLockedNow = await _userManager.IsLockedOutAsync(user);
 
         _db.AuditLogs.Add(new AuditLog
         {
             EntityType = "Users",
-            EntityID = user.UserID,
-            Action = "LoginSuccess",
-            PerformedBy = user.UserID,
+            EntityID = user.Id,
+            Action = isLockedNow ? "AccountLocked" : "LoginFailed",
+            PerformedBy = null,
             Timestamp = DateTime.UtcNow
         });
 
         await _db.SaveChangesAsync();
 
-        return new LoginOutcome(LoginResult.Success, user.UserID, user.Role, user.FullName);
+        return isLockedNow
+            ? new LoginOutcome(LoginResult.AccountLocked, null, null, null)
+            : new LoginOutcome(LoginResult.InvalidCredentials, null, null, null);
     }
 }

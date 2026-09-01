@@ -1,13 +1,14 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using QServe.Models;
 
 namespace QServe.Data;
 
-public class ApplicationDbContext : DbContext
+public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<int>, int>
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
-    public DbSet<User> Users => Set<User>();
     public DbSet<RestaurantTable> RestaurantTables => Set<RestaurantTable>();
     public DbSet<MenuCategory> MenuCategories => Set<MenuCategory>();
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
@@ -23,10 +24,17 @@ public class ApplicationDbContext : DbContext
         // ---- Users ----
         modelBuilder.Entity<User>(e =>
         {
-            e.HasIndex(u => u.Email).IsUnique();
+            e.ToTable("Users");
             e.ToTable(t => t.HasCheckConstraint("CK_Users_Role",
                 "\"Role\" IN ('Admin','Kitchen','Manager')"));
         });
+
+        modelBuilder.Entity<IdentityRole<int>>(e => e.ToTable("Roles"));
+        modelBuilder.Entity<IdentityUserRole<int>>(e => e.ToTable("UserRoles"));
+        modelBuilder.Entity<IdentityUserClaim<int>>(e => e.ToTable("UserClaims"));
+        modelBuilder.Entity<IdentityUserLogin<int>>(e => e.ToTable("UserLogins"));
+        modelBuilder.Entity<IdentityUserToken<int>>(e => e.ToTable("UserTokens"));
+        modelBuilder.Entity<IdentityRoleClaim<int>>(e => e.ToTable("RoleClaims"));
 
         // ---- RestaurantTables ----
         modelBuilder.Entity<RestaurantTable>(e =>
@@ -127,42 +135,76 @@ public class ApplicationDbContext : DbContext
 
     private static void SeedData(ModelBuilder modelBuilder)
     {
-        // BCrypt hashes for default dev accounts (Admin123!, Kitchen123!, Manager123!).
-        // Change these passwords before any shared or production deployment.
-        modelBuilder.Entity<User>().HasData(new User
-        {
-            UserID = 1,
-            FullName = "System Admin",
-            Email = "admin@restaurant.local",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
-            Role = UserRoles.Admin,
-            IsActive = true,
-            CreatedAt = new DateTime(2026, 1, 1),
-            AccessFailedCount = 0
-        },
-         new User
-         {
-             UserID = 2,
-             FullName = "Kitchen Staff",
-             Email = "kitchen@restaurant.local",
-             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Kitchen123!"),
-             Role = UserRoles.Kitchen,
-             IsActive = true,
-             CreatedAt = new DateTime(2026, 1, 1),
-             AccessFailedCount = 0
-         },
+        // ASP.NET Core Identity roles & user hashes for default dev accounts (Admin123!, Kitchen123!, Manager123!).
+        modelBuilder.Entity<IdentityRole<int>>().HasData(
+            new IdentityRole<int> { Id = 1, Name = QServe.Models.UserRoles.Admin, NormalizedName = QServe.Models.UserRoles.Admin.ToUpperInvariant() },
+            new IdentityRole<int> { Id = 2, Name = QServe.Models.UserRoles.Kitchen, NormalizedName = QServe.Models.UserRoles.Kitchen.ToUpperInvariant() },
+            new IdentityRole<int> { Id = 3, Name = QServe.Models.UserRoles.Manager, NormalizedName = QServe.Models.UserRoles.Manager.ToUpperInvariant() }
+        );
 
-        new User
+        var hasher = new PasswordHasher<User>();
+
+        var adminUser = new User
         {
-            UserID = 3,
-            FullName = "Restaurant Manager",
-            Email = "manager@restaurant.local",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Manager123!"),
-            Role = UserRoles.Manager,
+            Id = 1,
+            FullName = "System Admin",
+            UserName = "admin@restaurant.local",
+            NormalizedUserName = "ADMIN@RESTAURANT.LOCAL",
+            Email = "admin@restaurant.local",
+            NormalizedEmail = "ADMIN@RESTAURANT.LOCAL",
+            EmailConfirmed = true,
+            Role = QServe.Models.UserRoles.Admin,
             IsActive = true,
             CreatedAt = new DateTime(2026, 1, 1),
-            AccessFailedCount = 0
-        });
+            AccessFailedCount = 0,
+            SecurityStamp = "8D42A1E3-8E5A-40D9-97C5-3C72A99E9801",
+            ConcurrencyStamp = "B166FA12-054A-483A-A6DF-531A3F5B8B9B"
+        };
+        adminUser.PasswordHash = hasher.HashPassword(adminUser, "Admin123!");
+
+        var kitchenUser = new User
+        {
+            Id = 2,
+            FullName = "Kitchen Staff",
+            UserName = "kitchen@restaurant.local",
+            NormalizedUserName = "KITCHEN@RESTAURANT.LOCAL",
+            Email = "kitchen@restaurant.local",
+            NormalizedEmail = "KITCHEN@RESTAURANT.LOCAL",
+            EmailConfirmed = true,
+            Role = QServe.Models.UserRoles.Kitchen,
+            IsActive = true,
+            CreatedAt = new DateTime(2026, 1, 1),
+            AccessFailedCount = 0,
+            SecurityStamp = "9E53B2F4-9F6B-51EA-08D6-4D83B00F0902",
+            ConcurrencyStamp = "C277FB23-165B-594B-B7EC-642B4F6C9CAC"
+        };
+        kitchenUser.PasswordHash = hasher.HashPassword(kitchenUser, "Kitchen123!");
+
+        var managerUser = new User
+        {
+            Id = 3,
+            FullName = "Restaurant Manager",
+            UserName = "manager@restaurant.local",
+            NormalizedUserName = "MANAGER@RESTAURANT.LOCAL",
+            Email = "manager@restaurant.local",
+            NormalizedEmail = "MANAGER@RESTAURANT.LOCAL",
+            EmailConfirmed = true,
+            Role = QServe.Models.UserRoles.Manager,
+            IsActive = true,
+            CreatedAt = new DateTime(2026, 1, 1),
+            AccessFailedCount = 0,
+            SecurityStamp = "0F64C3A5-0A7C-62FB-19E7-5E94C11A1003",
+            ConcurrencyStamp = "D388FC34-276C-6A5C-C8FD-753C5A7D0DBD"
+        };
+        managerUser.PasswordHash = hasher.HashPassword(managerUser, "Manager123!");
+
+        modelBuilder.Entity<User>().HasData(adminUser, kitchenUser, managerUser);
+
+        modelBuilder.Entity<IdentityUserRole<int>>().HasData(
+            new IdentityUserRole<int> { UserId = 1, RoleId = 1 },
+            new IdentityUserRole<int> { UserId = 2, RoleId = 2 },
+            new IdentityUserRole<int> { UserId = 3, RoleId = 3 }
+        );
 
         var tables = new[] { "T01", "T02", "T03", "T04", "T05" };
         for (int i = 0; i < tables.Length; i++)

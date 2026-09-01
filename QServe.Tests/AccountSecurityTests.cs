@@ -1,11 +1,14 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using QServe.Controllers;
 using QServe.Data;
@@ -18,6 +21,8 @@ namespace QServe.Tests;
 public class AccountSecurityTests
 {
     private readonly ApplicationDbContext _db;
+    private readonly UserManager<User> _userManager;
+    private readonly SignInManager<User> _signInManager;
     private readonly AuthService _authService;
     private readonly PasswordResetService _passwordResetService;
     private readonly Mock<IEmailSender> _emailSenderMock = new();
@@ -34,13 +39,18 @@ public class AccountSecurityTests
             .Options;
         _db = new ApplicationDbContext(options);
 
+        var (userManager, signInManager) = CreateIdentityManagers(_db);
+        _userManager = userManager;
+        _signInManager = signInManager;
+
         _configMock.Setup(c => c["App:BaseUrl"]).Returns("https://qserve.example.com");
         _envMock.Setup(e => e.EnvironmentName).Returns("Development");
         _templateServiceMock.Setup(t => t.RenderPasswordResetTemplateAsync(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync("<html>Password Reset</html>");
 
-        _authService = new AuthService(_db);
+        _authService = new AuthService(_userManager, _signInManager, _db);
         _passwordResetService = new PasswordResetService(
+                _userManager,
                 _db,
                 _emailSenderMock.Object,
                 _templateServiceMock.Object,
@@ -48,7 +58,52 @@ public class AccountSecurityTests
                 _envMock.Object,
                 _loggerMock.Object,
                 _httpContextAccessorMock.Object);
-                }
+    }
+
+    private static (UserManager<User> UserManager, SignInManager<User> SignInManager) CreateIdentityManagers(ApplicationDbContext db)
+    {
+        var userStore = new UserStore<User, IdentityRole<int>, ApplicationDbContext, int>(db);
+        var passwordHasher = new PasswordHasher<User>();
+        var userOptions = new OptionsWrapper<IdentityOptions>(new IdentityOptions
+        {
+            Lockout = new LockoutOptions
+            {
+                DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15),
+                MaxFailedAccessAttempts = 5,
+                AllowedForNewUsers = true
+            }
+        });
+
+        var userManager = new UserManager<User>(
+            userStore,
+            userOptions,
+            passwordHasher,
+            new IUserValidator<User>[] { new UserValidator<User>() },
+            new IPasswordValidator<User>[] { new PasswordValidator<User>() },
+            new UpperInvariantLookupNormalizer(),
+            new IdentityErrorDescriber(),
+            (IServiceProvider)null!,
+            Mock.Of<ILogger<UserManager<User>>>());
+
+        userManager.RegisterTokenProvider(TokenOptions.DefaultProvider, new EmailTokenProvider<User>());
+
+        var roleStore = new RoleStore<IdentityRole<int>, ApplicationDbContext, int>(db);
+        var roleManager = new RoleManager<IdentityRole<int>>(roleStore, null, null, null, null);
+
+        var contextAccessor = new Mock<IHttpContextAccessor>();
+        var claimsFactory = new UserClaimsPrincipalFactory<User, IdentityRole<int>>(userManager, roleManager, userOptions);
+
+        var signInManager = new SignInManager<User>(
+            userManager,
+            contextAccessor.Object,
+            claimsFactory,
+            userOptions,
+            Mock.Of<ILogger<SignInManager<User>>>(),
+            null,
+            null);
+
+        return (userManager, signInManager);
+    }
 
     [Fact]
     public async Task ValidateLogin_WithValidCredentials_ReturnsSuccess()
@@ -57,12 +112,11 @@ public class AccountSecurityTests
         {
             FullName = "Admin User",
             Email = "admin@qserve.local",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("StrongPass123!"),
+            UserName = "admin@qserve.local",
             Role = UserRoles.Admin,
             IsActive = true
         };
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync();
+        await _userManager.CreateAsync(user, "StrongPass123!");
 
         var result = await _authService.ValidateLoginAsync("admin@qserve.local", "StrongPass123!");
 
@@ -78,13 +132,11 @@ public class AccountSecurityTests
         {
             FullName = "Admin User",
             Email = "admin@qserve.local",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("StrongPass123!"),
+            UserName = "admin@qserve.local",
             Role = UserRoles.Admin,
-            IsActive = true,
-            AccessFailedCount = 0
+            IsActive = true
         };
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync();
+        await _userManager.CreateAsync(user, "StrongPass123!");
 
         var result = await _authService.ValidateLoginAsync("admin@qserve.local", "WrongPassword");
 
@@ -100,20 +152,24 @@ public class AccountSecurityTests
         {
             FullName = "Admin User",
             Email = "admin@qserve.local",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("StrongPass123!"),
+            UserName = "admin@qserve.local",
             Role = UserRoles.Admin,
-            IsActive = true,
-            AccessFailedCount = 4 // 5th will trigger lockout
+            IsActive = true
         };
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync();
+        await _userManager.CreateAsync(user, "StrongPass123!");
+        await _userManager.SetLockoutEnabledAsync(user, true);
+
+        for (int i = 0; i < 4; i++)
+        {
+            await _userManager.AccessFailedAsync(user);
+        }
 
         var result = await _authService.ValidateLoginAsync("admin@qserve.local", "WrongPassword");
 
         Assert.Equal(LoginResult.AccountLocked, result.Result);
         var dbUser = await _db.Users.FindAsync(user.UserID);
         Assert.NotNull(dbUser!.LockoutEnd);
-        Assert.True(dbUser.LockoutEnd > DateTime.UtcNow);
+        Assert.True(dbUser.LockoutEnd > DateTimeOffset.UtcNow);
     }
 
     [Fact]
@@ -132,12 +188,11 @@ public class AccountSecurityTests
         {
             FullName = "Deactivated Staff",
             Email = "inactive@qserve.local",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("StrongPass123!"),
+            UserName = "inactive@qserve.local",
             Role = UserRoles.Kitchen,
             IsActive = false
         };
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync();
+        await _userManager.CreateAsync(user, "StrongPass123!");
 
         var result = await _authService.ValidateLoginAsync("inactive@qserve.local", "StrongPass123!");
 
@@ -151,20 +206,15 @@ public class AccountSecurityTests
         {
             FullName = "Chef Bob",
             Email = "chef@qserve.local",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("OldPass123!"),
+            UserName = "chef@qserve.local",
             Role = UserRoles.Kitchen,
             IsActive = true
         };
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync();
+        await _userManager.CreateAsync(user, "OldPass123!");
 
         var devLink = await _passwordResetService.RequestResetAsync("chef@qserve.local");
 
         Assert.NotNull(devLink);
-        var dbUser = await _db.Users.FindAsync(user.UserID);
-        Assert.NotNull(dbUser!.PasswordResetTokenHash);
-        Assert.NotNull(dbUser.PasswordResetTokenExpiry);
-
         _emailSenderMock.Verify(e => e.SendAsync(It.Is<EmailMessage>(m => m.ToEmail == "chef@qserve.local")), Times.Once);
     }
 
@@ -184,23 +234,20 @@ public class AccountSecurityTests
         {
             FullName = "Chef Bob",
             Email = "chef@qserve.local",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("OldPass123!"),
+            UserName = "chef@qserve.local",
             Role = UserRoles.Kitchen,
             IsActive = true
         };
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync();
+        await _userManager.CreateAsync(user, "OldPass123!");
 
         var devLink = await _passwordResetService.RequestResetAsync("chef@qserve.local");
         var token = devLink!.Split("token=")[1];
 
-        var resetSuccess = await _passwordResetService.ResetPasswordAsync("chef@qserve.local", token, "BrandNewPassword123!");
+        var resetSuccess = await _passwordResetService.ResetPasswordAsync("chef@qserve.local", Uri.UnescapeDataString(token), "BrandNewPassword123!");
 
         Assert.True(resetSuccess);
         var dbUser = await _db.Users.FindAsync(user.UserID);
-        Assert.Null(dbUser!.PasswordResetTokenHash);
-        Assert.Null(dbUser.PasswordResetTokenExpiry);
-        Assert.True(BCrypt.Net.BCrypt.Verify("BrandNewPassword123!", dbUser.PasswordHash));
+        Assert.True(await _userManager.CheckPasswordAsync(dbUser!, "BrandNewPassword123!"));
     }
 
     [Fact]
@@ -210,21 +257,21 @@ public class AccountSecurityTests
         {
             FullName = "Chef Bob",
             Email = "chef@qserve.local",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("OldPass123!"),
+            UserName = "chef@qserve.local",
             Role = UserRoles.Kitchen,
             IsActive = true
         };
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync();
+        await _userManager.CreateAsync(user, "OldPass123!");
 
         var devLink = await _passwordResetService.RequestResetAsync("chef@qserve.local");
         var token = devLink!.Split("token=")[1];
+        var unescapedToken = Uri.UnescapeDataString(token);
 
         // 1st reset
-        await _passwordResetService.ResetPasswordAsync("chef@qserve.local", token, "BrandNewPassword123!");
+        await _passwordResetService.ResetPasswordAsync("chef@qserve.local", unescapedToken, "BrandNewPassword123!");
 
         // 2nd replay attempt
-        var secondAttempt = await _passwordResetService.ResetPasswordAsync("chef@qserve.local", token, "AnotherPassword123!");
+        var secondAttempt = await _passwordResetService.ResetPasswordAsync("chef@qserve.local", unescapedToken, "AnotherPassword123!");
 
         Assert.False(secondAttempt);
     }
@@ -236,14 +283,13 @@ public class AccountSecurityTests
         {
             FullName = "Super Admin",
             Email = "admin@qserve.local",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("StrongPass123!"),
+            UserName = "admin@qserve.local",
             Role = UserRoles.Admin,
             IsActive = true
         };
-        _db.Users.Add(admin);
-        await _db.SaveChangesAsync();
+        await _userManager.CreateAsync(admin, "StrongPass123!");
 
-        var controller = new AdminStaffController(_db);
+        var controller = new AdminStaffController(_db, _userManager);
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, admin.UserID.ToString()),
@@ -269,7 +315,7 @@ public class AccountSecurityTests
         {
             FullName = "Admin One",
             Email = "admin1@qserve.local",
-            PasswordHash = "hash1",
+            UserName = "admin1@qserve.local",
             Role = UserRoles.Admin,
             IsActive = true
         };
@@ -277,14 +323,14 @@ public class AccountSecurityTests
         {
             FullName = "Admin Two",
             Email = "admin2@qserve.local",
-            PasswordHash = "hash2",
+            UserName = "admin2@qserve.local",
             Role = UserRoles.Admin,
             IsActive = true
         };
-        _db.Users.AddRange(admin1, admin2);
-        await _db.SaveChangesAsync();
+        await _userManager.CreateAsync(admin1, "StrongPass123!");
+        await _userManager.CreateAsync(admin2, "StrongPass123!");
 
-        var controller = new AdminStaffController(_db);
+        var controller = new AdminStaffController(_db, _userManager);
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, admin1.UserID.ToString()),

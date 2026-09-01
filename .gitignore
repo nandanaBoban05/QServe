@@ -367,7 +367,6 @@ FodyWeavers.xsd
 # appsettings.Development.json (with real local/test values) is NOT.
 **/appsettings.Development.json
 **/appsettings.Local.json
-**/appsettings.json
 .env
 .env.*
 
