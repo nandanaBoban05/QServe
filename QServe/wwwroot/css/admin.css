@@ -175,6 +175,11 @@
   background-color: var(--background);
 }
 
+.sidebar ~ .app-footer {
+  margin-left: 256px;
+  width: calc(100% - 256px);
+}
+
 .page {
   max-width: var(--container-max);
   margin: 0 auto;
@@ -201,7 +206,6 @@
   letter-spacing: 0.05em;
   font-weight: 600;
   color: var(--on-surface-variant);
-  margin-bottom: 2px;
 }
 
 /* =========================================================================
@@ -333,5 +337,11 @@
         margin-left: 0;
         max-width: 100%;
         padding: var(--margin-mobile);
+    }
+
+    .sidebar ~ .app-footer {
+        margin-left: 0;
+        width: 100%;
+        padding: 16px var(--margin-mobile);
     }
 }

@@ -39,6 +39,12 @@ builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
+// Security: Enforce 5-minute lifespan for password reset tokens
+builder.Services.Configure<DataProtectionTokenProviderOptions>(options =>
+{
+    options.TokenLifespan = TimeSpan.FromMinutes(5);
+});
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Forgot Password (self-service). Uses GmailEmailSender when EmailConfig has real credentials;

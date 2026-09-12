@@ -339,6 +339,7 @@ public class AdminMenuController : Controller
         var page = filter.Page > 0 ? filter.Page : 1;
 
         var categories = await query
+            .Include(c => c.Items)
             .OrderBy(c => c.DisplayOrder)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -355,30 +356,40 @@ public class AdminMenuController : Controller
         return View(filter);
     }
 
+    [HttpGet]
+    public IActionResult CreateCategory()
+    {
+        return View(new MenuCategory { DisplayOrder = 1, IsActive = true });
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateCategory(string name, int displayOrder)
+    public async Task<IActionResult> CreateCategory(MenuCategory category)
     {
-        if (string.IsNullOrWhiteSpace(name))
+        if (string.IsNullOrWhiteSpace(category.Name))
         {
-            TempData["CategoryError"] = "Category name is required.";
-            return RedirectToAction(nameof(Categories));
+            ModelState.AddModelError(nameof(category.Name), "Category name is required.");
+        }
+        else
+        {
+            category.Name = category.Name.Trim();
+            if (await _db.MenuCategories.AnyAsync(c => c.Name == category.Name))
+            {
+                ModelState.AddModelError(nameof(category.Name), $"Category \"{category.Name}\" already exists.");
+            }
         }
 
-        var trimmed = name.Trim();
-
-        if (await _db.MenuCategories.AnyAsync(c => c.Name == trimmed))
+        if (category.DisplayOrder < 1)
         {
-            TempData["CategoryError"] = $"Category \"{trimmed}\" already exists.";
-            return RedirectToAction(nameof(Categories));
+            category.DisplayOrder = 1;
         }
 
-        var category = new MenuCategory
+        if (!ModelState.IsValid)
         {
-            Name = trimmed,
-            DisplayOrder = displayOrder,
-            IsActive = true
-        };
+            return View(category);
+        }
+
+        category.IsActive = true;
 
         _db.MenuCategories.Add(category);
         await _db.SaveChangesAsync();
@@ -386,7 +397,7 @@ public class AdminMenuController : Controller
         await WriteAuditLogAsync("MenuCategories", category.CategoryID, "MenuCategoryCreated", null,
             JsonSerializer.Serialize(new { category.Name, category.DisplayOrder, category.IsActive }));
 
-        TempData["CategorySuccess"] = $"Category \"{trimmed}\" added.";
+        TempData["CategorySuccess"] = $"Category \"{category.Name}\" added.";
         return RedirectToAction(nameof(Categories));
     }
 

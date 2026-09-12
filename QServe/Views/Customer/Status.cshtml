@@ -31,7 +31,7 @@
     <span class="eyebrow">Order Confirmation</span>
     <h1 class="mono" style="font-size:30px; margin:4px 0; font-weight:800; color:var(--on-surface);">#@Model.OrderID.ToString("D5")</h1>
     <p class="text-muted mono" style="font-size:13.5px; margin-top:-2px; margin-bottom:20px;">
-        Table @(Model.Table?.TableNumber ?? Model.TableID.ToString()) &middot; @Model.CreatedAt.ToString("MMM d, HH:mm") UTC
+        Table @(Model.Table?.TableNumber ?? Model.TableID.ToString()) &middot; @Model.CreatedAt.ToIstString("MMM d, h:mm tt")
     </p>
 
     <!-- Visual Milestone Tracker -->
@@ -141,10 +141,8 @@
                 </p>
             </div>
         }
-        else if (Model.OrderStatus == "PendingPayment")
-        {
-            <p class="text-muted" style="font-size:13.5px; margin:10px 0 0;">
-                Waiting for payment completion. Click below to continue with your payment.
+            <p id="status-message" class="text-muted" style="font-size:13.5px; margin:10px 0 0;">
+                Your order is awaiting payment.
             </p>
             <div style="margin-top:16px;">
                 @if (latestPayment?.PaymentMode == "Online")
@@ -182,33 +180,44 @@
                         <span>Please go to the Cash Manager / Front Desk and make your cash payment. Staff will verify and approve the payment from the admin system.</span>
                     }
                 </div>
-                <p style="margin:8px 0 0; font-size:12.5px; color:var(--on-surface-variant);">
-                    Once payment is completed, staff will verify and approve your payment. This screen will update automatically.
-                </p>
-            </div>
+            <p id="status-message" class="text-muted" style="font-size:13.5px; margin:10px 0 0;">
+                Your order is awaiting payment.
+            </p>
         }
         else if (Model.OrderStatus == "Approved")
         {
-            <p style="font-size:13.5px; margin:10px 0 0; color:var(--status-approved-text); font-weight:500;">
+            <p id="status-message" style="font-size:13.5px; margin:10px 0 0; color:var(--status-approved-text); font-weight:500;">
                 Order approved! The kitchen has received your ticket and will start preparation shortly.
             </p>
         }
         else if (Model.OrderStatus == "Preparing")
         {
-            <p style="font-size:13.5px; margin:10px 0 0; color:var(--status-preparing-text); font-weight:500;">
-                Your food is actively being prepared by the culinary staff.
+            <p id="status-message" style="font-size:13.5px; margin:10px 0 0; color:var(--status-preparing-text); font-weight:500;">
+                Your order is being prepared by the kitchen.
             </p>
         }
         else if (Model.OrderStatus == "Ready")
         {
-            <p style="font-size:13.5px; margin:10px 0 0; color:var(--status-ready-text); font-weight:600;">
-                Your order is ready! A staff member is bringing it to Table @(Model.Table?.TableNumber ?? Model.TableID.ToString()).
+            <p id="status-message" style="font-size:13.5px; margin:10px 0 0; color:var(--status-ready-text); font-weight:600;">
+                Your order is ready for serving.
             </p>
         }
         else if (Model.OrderStatus == "Served")
         {
-            <p style="font-size:13.5px; margin:10px 0 0; color:var(--on-surface-variant); font-weight:500;">
-                Enjoy your meal! Thank you for dining with QServe.
+            <p id="status-message" style="font-size:13.5px; margin:10px 0 0; color:var(--on-surface-variant); font-weight:500;">
+                Your order has been served. Enjoy your meal!
+            </p>
+        }
+        else if (Model.OrderStatus == "Cancelled")
+        {
+            <p id="status-message" style="color:var(--error); font-size:14px; margin:14px 0 0; font-weight:600;">
+                Your order has been cancelled.
+            </p>
+        }
+        else
+        {
+            <p id="status-message" style="font-size:13.5px; margin:10px 0 0; color:var(--on-surface-variant); font-weight:500;">
+                @Model.OrderStatus
             </p>
         }
     </div>
@@ -222,7 +231,7 @@
                     <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
                     <line x1="1" y1="10" x2="23" y2="10"></line>
                 </svg>
-                <h3 style="margin:0; font-size:16px; font-weight:700;">Retry Payment</h3>
+                <h3 style="margin:0; font-size:16px; font-weight:700;">RETRY PAYMENT</h3>
             </div>
 
             <form asp-controller="Customer" asp-action="Repay" method="post" id="repayForm">
@@ -319,7 +328,7 @@
                     <line x1="15" y1="9" x2="9" y2="15"></line>
                     <line x1="9" y1="9" x2="15" y2="15"></line>
                 </svg>
-                <h3 style="margin:0; font-size:18px;">Cancel this order?</h3>
+                <h3 style="margin:0; font-size:18px;">CANCEL THIS ORDER?</h3>
             </div>
             <button type="button" onclick="closeCancelOrderModal()" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:18px;">&times;</button>
         </div>
@@ -364,10 +373,43 @@
         return true;
     }
 
+    const statusMessages = {
+        "PendingPayment": "Your order is awaiting payment.",
+        "AwaitingVerification": "Your order is awaiting payment.",
+        "Approved": "Order approved! The kitchen has received your ticket and will start preparation shortly.",
+        "Preparing": "Your order is being prepared by the kitchen.",
+        "Ready": "Your order is ready for serving.",
+        "Served": "Your order has been served. Enjoy your meal!",
+        "Cancelled": "Your order has been cancelled."
+    };
+
+    const statusColors = {
+        "PendingPayment": "var(--on-surface-variant)",
+        "AwaitingVerification": "var(--primary)",
+        "Approved": "var(--status-approved-text)",
+        "Preparing": "var(--status-preparing-text)",
+        "Ready": "var(--status-ready-text)",
+        "Served": "var(--on-surface-variant)",
+        "Cancelled": "var(--error)"
+    };
+
     function applyStatus(newStatus) {
         if (!newStatus) return;
         const statusEl = document.getElementById("status-text");
-        if (statusEl) statusEl.textContent = newStatus;
+        if (statusEl) {
+            statusEl.textContent = newStatus;
+            if (newStatus === "Cancelled") {
+                statusEl.style.color = "var(--error)";
+            }
+        }
+
+        const msgEl = document.getElementById("status-message");
+        if (msgEl && statusMessages[newStatus]) {
+            msgEl.textContent = statusMessages[newStatus];
+            if (statusColors[newStatus]) {
+                msgEl.style.color = statusColors[newStatus];
+            }
+        }
 
         document.querySelectorAll(".punch-step").forEach(el => {
             const idx = stepOrder.indexOf(el.dataset.step);

@@ -17,7 +17,7 @@
         </a>
     </div>
 
-    <h1 class="headline-lg" style="margin-bottom:16px;">Review Your Order</h1>
+    <h1 class="headline-lg" style="margin-bottom:16px;">REVIEW YOUR ORDER</h1>
 
     @if (TempData["CartError"] is string cartError)
     {
@@ -107,7 +107,7 @@
 
         <form id="checkout-form" asp-action="Checkout" asp-route-tableId="@tableId" method="post" class="mt-lg">
             @Html.AntiForgeryToken()
-            <h3 style="margin-bottom:14px; font-size:16px;">Choose Payment Method</h3>
+            <h3 style="margin-bottom:14px; font-size:16px;">CHOOSE PAYMENT METHOD</h3>
 
             <div style="display:flex; flex-direction:column; gap:10px;">
                 <label class="payment-choice">

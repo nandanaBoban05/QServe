@@ -522,31 +522,49 @@ public class AdminController : Controller
         return RedirectToAction(nameof(Tables));
     }
 
+    [HttpGet]
+    public IActionResult CreateTable()
+    {
+        return View(new RestaurantTable { Capacity = 4, IsActive = true });
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateTable(string tableNumber, int capacity)
+    public async Task<IActionResult> CreateTable(RestaurantTable table)
     {
-        if (string.IsNullOrWhiteSpace(tableNumber))
+        if (string.IsNullOrWhiteSpace(table.TableNumber))
         {
-            TempData["TableError"] = "Table number is required.";
-            return RedirectToAction(nameof(Tables));
+            ModelState.AddModelError(nameof(table.TableNumber), "Table number / code is required.");
+        }
+        else
+        {
+            table.TableNumber = table.TableNumber.Trim();
+            if (table.TableNumber.Length > 10)
+            {
+                ModelState.AddModelError(nameof(table.TableNumber), "Table code cannot exceed 10 characters.");
+            }
+            else if (!System.Text.RegularExpressions.Regex.IsMatch(table.TableNumber, @"^[a-zA-Z0-9\-_ ]{1,10}$"))
+            {
+                ModelState.AddModelError(nameof(table.TableNumber), "Table code can only contain letters, numbers, hyphens, and spaces (e.g. T01, T-02, 10).");
+            }
+            else if (await _db.RestaurantTables.AnyAsync(t => t.TableNumber == table.TableNumber))
+            {
+                ModelState.AddModelError(nameof(table.TableNumber), $"Table code \"{table.TableNumber}\" already exists.");
+            }
         }
 
-        var trimmedNumber = tableNumber.Trim();
-
-        if (await _db.RestaurantTables.AnyAsync(t => t.TableNumber == trimmedNumber))
+        if (table.Capacity <= 0)
         {
-            TempData["TableError"] = $"Table \"{trimmedNumber}\" already exists.";
-            return RedirectToAction(nameof(Tables));
+            ModelState.AddModelError(nameof(table.Capacity), "Capacity must be at least 1 seat.");
         }
 
-        var table = new RestaurantTable
+        if (!ModelState.IsValid)
         {
-            TableNumber = trimmedNumber,
-            Capacity = capacity > 0 ? capacity : 4,
-            IsActive = true,
-            QRCodeData = string.Empty
-        };
+            return View(table);
+        }
+
+        table.IsActive = true;
+        table.QRCodeData = string.Empty;
 
         _db.RestaurantTables.Add(table);
         await _db.SaveChangesAsync();

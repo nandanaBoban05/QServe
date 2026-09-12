@@ -1,0 +1,62 @@
+@model QServe.Models.RestaurantTable
+@{
+    ViewData["Title"] = "Add New Table";
+}
+
+<partial name="_AdminNav" />
+
+<div class="page page--narrow">
+    <div class="page-head">
+        <div>
+            <a asp-action="Tables" class="btn btn-ghost btn-sm" style="margin-bottom:8px; padding-left:0;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Tables
+            </a>
+            <span class="eyebrow" style="display:block;">Floor Management</span>
+            <h1 class="headline-lg">ADD NEW TABLE</h1>
+        </div>
+    </div>
+
+    <div class="card">
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="validation-summary-errors">
+                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <p>@error.ErrorMessage</p>
+                }
+            </div>
+        }
+
+        <form asp-action="CreateTable" method="post">
+            @Html.AntiForgeryToken()
+
+            <div class="form-group">
+                <label>Table Number / Code <span style="color:var(--error);">*</span></label>
+                <input type="text" name="TableNumber" value="@Model?.TableNumber" placeholder="e.g. T01, T02, T-03, 10" required autofocus maxlength="10" />
+                <span class="text-muted" style="font-size:12px; display:block; margin-top:4px;">Enter a unique table code such as T01, T02, or 10.</span>
+                @if (ViewData.ModelState["TableNumber"]?.Errors.Any() == true)
+                {
+                    <span class="text-danger" style="font-size:12.5px; margin-top:4px; display:block;">@ViewData.ModelState["TableNumber"]!.Errors.First().ErrorMessage</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label>Seating Capacity <span style="color:var(--error);">*</span></label>
+                <input type="number" name="Capacity" value="@(Model?.Capacity > 0 ? Model.Capacity : 4)" min="1" max="50" required />
+                @if (ViewData.ModelState["Capacity"]?.Errors.Any() == true)
+                {
+                    <span class="text-danger" style="font-size:12.5px; margin-top:4px; display:block;">@ViewData.ModelState["Capacity"]!.Errors.First().ErrorMessage</span>
+                }
+            </div>
+
+            <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--surface-container-high); display:flex; gap:12px; justify-content:flex-end;">
+                <a asp-action="Tables" class="btn btn-outline">Cancel</a>
+                <button type="submit" class="btn btn-primary" style="padding:10px 24px;">+ Create Restaurant Table</button>
+            </div>
+        </form>
+    </div>
+</div>

@@ -18,7 +18,7 @@
                 Back to Orders
             </a>
             <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-                <h1 class="headline-lg" style="margin:0;">Order #@order.OrderID.ToString("D5")</h1>
+                <h1 class="headline-lg" style="margin:0;">ORDER #@order.OrderID.ToString("D5")</h1>
                 @{
                     string badgeClass = order.OrderStatus switch {
                         "Approved" => "badge-approved",
@@ -38,7 +38,7 @@
             </div>
         </div>
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-            <span class="text-muted mono" style="font-size:13px;">Placed: @order.CreatedAt.ToString("MMM d, yyyy HH:mm:ss") UTC</span>
+            <span class="text-muted mono" style="font-size:13px;">Placed: @order.CreatedAt.ToIstString("MMM d, yyyy h:mm:ss tt")</span>
             @if (order.OrderStatus != "Cancelled")
             {
                 <button type="button" class="btn btn-outline btn-sm" style="color:var(--error); border-color:var(--error); padding:4px 10px; font-size:12px;" onclick="openCancelOrderModal()">
@@ -136,10 +136,10 @@
         <div class="stat-card">
             <div>
                 <div class="stat-label">Order Timing</div>
-                <div class="stat-value mt-sm" style="font-size:20px;">@order.CreatedAt.ToString("HH:mm:ss") UTC</div>
+                <div class="stat-value mt-sm" style="font-size:20px;">@order.CreatedAt.ToIstTimeString("h:mm:ss tt")</div>
             </div>
             <div class="text-muted" style="font-size:12px; margin-top:6px;">
-                Date: @order.CreatedAt.ToString("MMM d, yyyy")
+                Date: @order.CreatedAt.ToIst().ToString("MMM d, yyyy")
             </div>
         </div>
 
@@ -178,7 +178,7 @@
 
     <!-- Ordered Items Breakdown Chit -->
     <div class="card mt-lg">
-        <h3 style="margin-bottom:16px;">Ordered Items Breakdown</h3>
+        <h3 style="margin-bottom:16px;">ORDERED ITEMS BREAKDOWN</h3>
         <div class="data-table-container">
             <table class="data-table">
                 <thead>
@@ -238,7 +238,7 @@
         <!-- Payment Attempts & History Section -->
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                <h3 style="margin:0;">Payment History &amp; Attempts</h3>
+                <h3 style="margin:0;">PAYMENT HISTORY &amp; ATTEMPTS</h3>
                 <span class="mono text-muted" style="font-size:12px;">@Model.PaymentAttempts.Count attempt(s)</span>
             </div>
 
@@ -266,7 +266,7 @@
                                     }
                                 </span>
                                 <div style="font-size:12px; color:var(--on-surface-variant); margin-top:2px;">
-                                    Mode: <strong>@p.PaymentMode</strong> &middot; @p.CreatedAt.ToString("MMM d, yyyy HH:mm:ss") UTC
+                                    Mode: <strong>@p.PaymentMode</strong> &middot; @p.CreatedAt.ToIstString("MMM d, yyyy h:mm:ss tt")
                                 </div>
                             </div>
                             <div style="text-align:right;">
@@ -287,7 +287,7 @@
                         @if (p.VerifiedByUser != null)
                         {
                             <div style="font-size:12px; color:var(--on-surface-variant); margin-top:6px;">
-                                Verified by: <strong>@p.VerifiedByUser.FullName</strong> (@p.VerifiedByUser.Role) at @p.VerificationTime?.ToString("HH:mm:ss") UTC
+                                Verified by: <strong>@p.VerifiedByUser.FullName</strong> (@p.VerifiedByUser.Role) at @(p.VerificationTime.HasValue ? p.VerificationTime.Value.ToIstTimeString("h:mm:ss tt") : "-")
                             </div>
                         }
 
@@ -295,24 +295,6 @@
                         {
                             <div class="mono text-muted" style="font-size:11px; margin-top:4px;">
                                 Razorpay ID: @p.RazorpayPaymentID
-                            </div>
-                        }
-
-                        @if (p.PaymentStatus == "Received")
-                        {
-                            <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--outline-variant);">
-                                <form asp-action="RefundPayment" method="post"
-                                      onsubmit="return confirm('Are you sure you want to refund ₹@p.Amount.ToString("0.00") for Payment #@p.PaymentID?');">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="paymentId" value="@p.PaymentID" />
-                                    <button type="submit" class="btn btn-outline btn-sm" style="color:var(--error); border-color:var(--error); padding:4px 10px; font-size:12px;">
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polyline points="1 4 1 10 7 10"></polyline>
-                                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                                        </svg>
-                                        Process Refund
-                                    </button>
-                                </form>
                             </div>
                         }
                     </div>
@@ -323,7 +305,7 @@
 
         <!-- Order Lifecycle Timeline -->
         <div class="card">
-            <h3 style="margin-bottom:16px;">Order Lifecycle Timeline</h3>
+            <h3 style="margin-bottom:16px;">ORDER LIFECYCLE TIMELINE</h3>
             @if (!Model.Timeline.Any())
             {
                 <div class="empty-state" style="padding:24px 0;">
@@ -340,7 +322,7 @@
                         <div style="flex:1;">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <strong style="font-size:13.5px; color:var(--on-surface);">@log.Action.Replace("_", " ")</strong>
-                                <span class="text-muted mono" style="font-size:11px;">@log.Timestamp.ToString("MMM d, HH:mm:ss")</span>
+                                <span class="text-muted mono" style="font-size:11px;">@log.Timestamp.ToIstString("MMM d, h:mm:ss tt")</span>
                             </div>
                             <div style="font-size:12px; color:var(--on-surface-variant); margin-top:2px;">
                                 By: <strong>@(log.PerformedByUser?.FullName ?? "System / Customer")</strong>
@@ -374,7 +356,7 @@
                     <line x1="12" y1="8" x2="12" y2="12"></line>
                     <line x1="12" y1="16" x2="12.01" y2="16"></line>
                 </svg>
-                <h3 style="margin:0; font-size:18px;">Reject Payment</h3>
+                <h3 style="margin:0; font-size:18px;">REJECT PAYMENT</h3>
             </div>
             <button type="button" onclick="closeRejectModal()" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:16px;">&times;</button>
         </div>
@@ -421,7 +403,7 @@
                     <line x1="15" y1="9" x2="9" y2="15"></line>
                     <line x1="9" y1="9" x2="15" y2="15"></line>
                 </svg>
-                <h3 style="margin:0; font-size:18px;">Cancel Order</h3>
+                <h3 style="margin:0; font-size:18px;">CANCEL ORDER</h3>
             </div>
             <button type="button" onclick="closeCancelOrderModal()" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:16px;">&times;</button>
         </div>

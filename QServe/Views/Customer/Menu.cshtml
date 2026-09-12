@@ -53,7 +53,7 @@
 
     <!-- ================= WELCOME ================= -->
     <section class="customer-welcome">
-        <h1>Welcome back!</h1>
+        <h1>WELCOME BACK!</h1>
         <p>Explore our flavors.</p>
     </section>
 
@@ -92,7 +92,7 @@
         @foreach (var category in Model)
         {
             <div id="cat-@category.CategoryID" class="customer-category-section" style="scroll-margin-top:110px;">
-                <h2 class="customer-menu-section-title">@category.Name</h2>
+                <h2 class="customer-menu-section-title">@category.Name.ToUpper()</h2>
 
                 @if (!category.Items.Any())
                 {

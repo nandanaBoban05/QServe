@@ -16,7 +16,7 @@
                 Back to Staff List
             </a>
             <span class="eyebrow" style="display:block;">Access Control</span>
-            <h1 class="headline-lg">Edit: @Model.FullName</h1>
+            <h1 class="headline-lg">EDIT: @Model.FullName.ToUpper()</h1>
         </div>
     </div>
 
@@ -35,23 +35,35 @@
             @Html.AntiForgeryToken()
 
             <div class="form-group">
-                <label>Full Name</label>
+                <label>Full Name <span style="color:var(--error);">*</span></label>
                 <input type="text" name="fullName" value="@Model.FullName" required />
+                @if (ViewData.ModelState["fullName"]?.Errors.Any() == true)
+                {
+                    <span class="text-danger" style="font-size:12.5px; margin-top:4px; display:block;">@ViewData.ModelState["fullName"]!.Errors.First().ErrorMessage</span>
+                }
             </div>
 
             <div class="form-group">
-                <label>Email Address</label>
+                <label>Email Address <span style="color:var(--error);">*</span></label>
                 <input type="email" name="email" value="@Model.Email" required />
+                @if (ViewData.ModelState["email"]?.Errors.Any() == true)
+                {
+                    <span class="text-danger" style="font-size:12.5px; margin-top:4px; display:block;">@ViewData.ModelState["email"]!.Errors.First().ErrorMessage</span>
+                }
             </div>
 
             <div class="form-group">
-                <label>Role</label>
+                <label>Role <span style="color:var(--error);">*</span></label>
                 <select name="role" required>
                     @foreach (var r in new[] { "Kitchen", "Manager", "Admin" })
                     {
                         <option value="@r" selected="@(r == Model.Role)">@r</option>
                     }
                 </select>
+                @if (ViewData.ModelState["role"]?.Errors.Any() == true)
+                {
+                    <span class="text-danger" style="font-size:12.5px; margin-top:4px; display:block;">@ViewData.ModelState["role"]!.Errors.First().ErrorMessage</span>
+                }
             </div>
 
             <p class="text-muted" style="font-size:12px; margin-top:8px;">

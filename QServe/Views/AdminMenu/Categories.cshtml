@@ -9,10 +9,17 @@
     <div class="page-head">
         <div>
             <span class="eyebrow">Menu Organization</span>
-            <h1 class="headline-lg">Menu Categories</h1>
+            <h1 class="headline-lg">MENU CATEGORIES</h1>
         </div>
-        <div class="mono text-muted" style="font-size:13.5px;">
-            Total: <strong style="color:var(--on-surface);">@Model.Categories.TotalCount</strong> sections
+        <div style="display:flex; align-items:center; gap:12px;">
+            <span class="mono text-muted" style="font-size:13.5px;">Total: <strong style="color:var(--on-surface);">@Model.Categories.TotalCount</strong> sections</span>
+            <a asp-action="CreateCategory" class="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                + Add Category
+            </a>
         </div>
     </div>
 
@@ -156,26 +163,6 @@
         </div>
 
         <partial name="_Pagination" model="Model.Categories" />
-    </div>
-
-    <div class="card mt-lg">
-        <h3 style="margin-bottom:16px;">Add New Category</h3>
-        <form asp-action="CreateCategory" method="post">
-            @Html.AntiForgeryToken()
-            <div class="form-grid-2">
-                <div class="form-group">
-                    <label>Category Name</label>
-                    <input type="text" name="name" placeholder="e.g. Desserts, Chef Specials" required />
-                </div>
-                <div class="form-group">
-                    <label>Display Order (Priority)</label>
-                    <input type="number" name="displayOrder" value="1" min="1" max="99" required />
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary btn-block" style="padding:12px; margin-top:8px;">
-                + Add Category Section
-            </button>
-        </form>
     </div>
 </div>
 

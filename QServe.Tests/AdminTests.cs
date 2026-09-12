@@ -386,4 +386,33 @@ public class AdminTests
         Assert.Equal(nameof(AdminController.OrderDetails), result.ActionName);
         Assert.NotNull(_adminController.TempData["OrderDetailsError"]);
     }
+
+    [Fact]
+    public async Task Menu_Categories_EagerLoadsItemsCountCorrectly()
+    {
+        var cat1 = new MenuCategory { Name = "Beverages", DisplayOrder = 1, IsActive = true };
+        var cat2 = new MenuCategory { Name = "Desserts", DisplayOrder = 2, IsActive = true };
+        _db.MenuCategories.AddRange(cat1, cat2);
+        await _db.SaveChangesAsync();
+
+        _db.MenuItems.AddRange(
+            new MenuItem { Name = "Tea", CategoryID = cat1.CategoryID, Price = 20, ItemType = ItemTypes.Beverage },
+            new MenuItem { Name = "Coffee", CategoryID = cat1.CategoryID, Price = 30, ItemType = ItemTypes.Beverage },
+            new MenuItem { Name = "Juice", CategoryID = cat1.CategoryID, Price = 50, ItemType = ItemTypes.Beverage }
+        );
+        await _db.SaveChangesAsync();
+
+        var filter = new AdminCategoryFilterViewModel();
+        var result = await _menuController.Categories(filter) as ViewResult;
+
+        Assert.NotNull(result);
+        var model = Assert.IsType<AdminCategoryFilterViewModel>(result.Model);
+        Assert.Equal(2, model.Categories.Items.Count);
+
+        var beveragesCategory = model.Categories.Items.First(c => c.CategoryID == cat1.CategoryID);
+        var dessertsCategory = model.Categories.Items.First(c => c.CategoryID == cat2.CategoryID);
+
+        Assert.Equal(3, beveragesCategory.Items.Count);
+        Assert.Empty(dessertsCategory.Items);
+    }
 }

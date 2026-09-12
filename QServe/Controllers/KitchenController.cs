@@ -63,6 +63,25 @@ public class KitchenController : Controller
 
         var orders = await query.OrderBy(o => o.CreatedAt).ToListAsync();
 
+        var readyOrderIds = orders.Where(o => o.OrderStatus is OrderStatuses.Ready or OrderStatuses.Served && o.ReadyAt == null).Select(o => o.OrderID).ToList();
+        if (readyOrderIds.Any())
+        {
+            var readyLogs = await _db.AuditLogs.AsNoTracking()
+                .Where(a => a.EntityType == "Orders" && readyOrderIds.Contains(a.EntityID) && a.Action == "OrderMarkedReady")
+                .GroupBy(a => a.EntityID)
+                .Select(g => new { OrderID = g.Key, Timestamp = g.Max(a => a.Timestamp) })
+                .ToListAsync();
+
+            var logDict = readyLogs.ToDictionary(l => l.OrderID, l => l.Timestamp);
+            foreach (var order in orders.Where(o => o.OrderStatus is OrderStatuses.Ready or OrderStatuses.Served && o.ReadyAt == null))
+            {
+                if (logDict.TryGetValue(order.OrderID, out var ts))
+                {
+                    order.ReadyAt = ts;
+                }
+            }
+        }
+
         // Calculate live tab counts for kitchen staff
         var allKitchenOrders = await _db.Orders.AsNoTracking()
             .Where(o => ActiveStatuses.Contains(o.OrderStatus) || (o.OrderStatus == OrderStatuses.Served && o.CreatedAt >= todayStart))
@@ -118,9 +137,14 @@ public class KitchenController : Controller
         var oldStatus = order.OrderStatus;
         order.OrderStatus = newStatus;
 
-        if (newStatus == OrderStatuses.Served)
+        if (newStatus == OrderStatuses.Ready)
+        {
+            order.ReadyAt = DateTime.UtcNow;
+        }
+        else if (newStatus == OrderStatuses.Served)
         {
             order.ServedAt = DateTime.UtcNow;
+            order.ReadyAt ??= DateTime.UtcNow;
         }
 
         var staffUserIdRaw = User.FindFirstValue(ClaimTypes.NameIdentifier);

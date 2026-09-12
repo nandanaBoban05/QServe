@@ -277,6 +277,96 @@ public class AccountSecurityTests
     }
 
     [Fact]
+    public async Task RequestReset_WhenNewLinkRequested_InvalidatesPreviousToken_AndOnlyLatestTokenWorks()
+    {
+        var user = new User
+        {
+            FullName = "Chef Bob",
+            Email = "chef@qserve.local",
+            UserName = "chef@qserve.local",
+            Role = UserRoles.Kitchen,
+            IsActive = true
+        };
+        await _userManager.CreateAsync(user, "OldPass123!");
+
+        // 1st request
+        var devLink1 = await _passwordResetService.RequestResetAsync("chef@qserve.local");
+        var token1 = Uri.UnescapeDataString(devLink1!.Split("token=")[1]);
+
+        // 2nd request (invalidates token1)
+        var devLink2 = await _passwordResetService.RequestResetAsync("chef@qserve.local");
+        var token2 = Uri.UnescapeDataString(devLink2!.Split("token=")[1]);
+
+        // Attempting to reset with obsolete token1 must fail
+        var result1 = await _passwordResetService.ResetPasswordAsync("chef@qserve.local", token1, "NewPassword123!");
+        Assert.False(result1);
+
+        // Attempting to reset with latest token2 must succeed
+        var result2 = await _passwordResetService.ResetPasswordAsync("chef@qserve.local", token2, "NewPassword123!");
+        Assert.True(result2);
+    }
+
+    [Fact]
+    public async Task ResetPassword_WithTamperedToken_Fails()
+    {
+        var user = new User
+        {
+            FullName = "Chef Bob",
+            Email = "chef@qserve.local",
+            UserName = "chef@qserve.local",
+            Role = UserRoles.Kitchen,
+            IsActive = true
+        };
+        await _userManager.CreateAsync(user, "OldPass123!");
+
+        var devLink = await _passwordResetService.RequestResetAsync("chef@qserve.local");
+        var token = Uri.UnescapeDataString(devLink!.Split("token=")[1]);
+        var tamperedToken = token + "_tampered_invalid";
+
+        var result = await _passwordResetService.ResetPasswordAsync("chef@qserve.local", tamperedToken, "NewPassword123!");
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task ResetPassword_AllowsLoginWithNewPassword_AndRejectsOldPassword()
+    {
+        var user = new User
+        {
+            FullName = "Chef Bob",
+            Email = "chef@qserve.local",
+            UserName = "chef@qserve.local",
+            Role = UserRoles.Kitchen,
+            IsActive = true
+        };
+        await _userManager.CreateAsync(user, "OldPass123!");
+
+        var devLink = await _passwordResetService.RequestResetAsync("chef@qserve.local");
+        var token = Uri.UnescapeDataString(devLink!.Split("token=")[1]);
+
+        var resetSuccess = await _passwordResetService.ResetPasswordAsync("chef@qserve.local", token, "FreshSecurePass123!");
+        Assert.True(resetSuccess);
+
+        // Old password rejected
+        var oldLoginResult = await _authService.ValidateLoginAsync("chef@qserve.local", "OldPass123!");
+        Assert.Equal(LoginResult.InvalidCredentials, oldLoginResult.Result);
+
+        // New password accepted
+        var newLoginResult = await _authService.ValidateLoginAsync("chef@qserve.local", "FreshSecurePass123!");
+        Assert.Equal(LoginResult.Success, newLoginResult.Result);
+    }
+
+    [Fact]
+    public async Task ResetPassword_Controller_RejectsMismatchingPasswords_WithoutCallingService()
+    {
+        var controller = new AccountController(_authService, _passwordResetService, _signInManager, _userManager);
+        var result = await controller.ResetPassword("test@qserve.local", "valid-token", "NewPassword123!", "MismatchPassword999!") as ViewResult;
+
+        Assert.NotNull(result);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.Contains(controller.ModelState.Values.SelectMany(v => v.Errors), e => e.ErrorMessage == "Passwords do not match.");
+    }
+
+    [Fact]
     public async Task StaffManagement_CannotDeactivateOwnAccount()
     {
         var admin = new User

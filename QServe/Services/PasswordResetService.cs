@@ -51,6 +51,9 @@ public class PasswordResetService : IPasswordResetService
         if (user is null || !user.IsActive)
             return null;
 
+        // Invalidate all previous reset tokens immediately so only the latest link works
+        await _userManager.UpdateSecurityStampAsync(user);
+
         var rawToken = await _userManager.GeneratePasswordResetTokenAsync(user);
 
         _db.AuditLogs.Add(new AuditLog

@@ -88,32 +88,42 @@
     <div class="kds-grid">
         @foreach (var order in Model)
         {
-            var elapsed = DateTime.UtcNow - order.CreatedAt;
+            var isFrozen = order.OrderStatus is QServe.Models.OrderStatuses.Ready or QServe.Models.OrderStatuses.Served or QServe.Models.OrderStatuses.Cancelled;
+            var startTime = order.ApprovedAt ?? order.CreatedAt;
+            var endTime = isFrozen ? (order.ReadyAt ?? order.ServedAt ?? DateTime.UtcNow) : DateTime.UtcNow;
+            var elapsed = endTime - startTime;
+            if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
             var elapsedMinutes = (int)elapsed.TotalMinutes;
             var timerText = elapsed.TotalHours >= 1
                 ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:D2}:{elapsed.Seconds:D2}"
                 : $"{elapsedMinutes:D2}:{elapsed.Seconds:D2}";
-
             var tierClass = order.OrderType == "Quick" ? "tier-quick" : order.OrderType == "Heavy" ? "tier-heavy" : "tier-regular";
 
             <div class="kds-card @tierClass" data-order-id="@order.OrderID">
-                <div class="kds-card__head">
-                    <div>
-                        <div class="kds-table-title">@(order.Table?.TableNumber ?? "-")</div>
-                    </div>
-                    <span class="badge @tierClass">
-                        @order.OrderType
+            <div class="kds-card__head">
+                <div>
+                    <div class="kds-table-title">@(order.Table?.TableNumber ?? "-")</div>
+                </div>
+                <span class="badge @tierClass">
+                    @order.OrderType
+                </span>
+            </div>
+
+            <div class="kds-meta-row" style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="kds-order-id">#@order.OrderID.ToString("D5")</span>
+
+                <div style="display:inline-flex; align-items:center; gap:6px;">
+                    <span class="eyebrow" style="font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--on-surface-muted);">
+                        PREPARATION TIME
+                    </span>
+                    <span class="kds-timer"
+                          data-start-time="@startTime.ToUniversalTime().ToString("O")"
+                          data-is-completed="@(isFrozen ? "true" : "false")"
+                          title="Measures duration from approval until ready">
+                        @timerText
                     </span>
                 </div>
-
-    <div class="kds-meta-row">
-        <span class="kds-order-id">#@order.OrderID.ToString("D5")</span>
-
-        <span class="kds-timer"
-              data-created-at="@order.CreatedAt.ToUniversalTime().ToString("O")">
-            @timerText
-        </span>
-    </div>
+            </div>
 
                 @if (!string.IsNullOrWhiteSpace(order.Notes))
                 {
@@ -218,11 +228,31 @@
             hour12: true
         }).format(new Date());
 
-        el.textContent = indiaTime;
+        el.textContent = indiaTime + ' IST';
+    }
+
+    function updateKdsCardTimers() {
+        const timers = document.querySelectorAll('.kds-timer');
+        const now = new Date();
+        timers.forEach(el => {
+            if (el.dataset.isCompleted === 'true') return;
+            const startIso = el.dataset.startTime;
+            if (!startIso) return;
+            const start = new Date(startIso);
+            const diffMs = Math.max(0, now - start);
+            const totalSec = Math.floor(diffMs / 1000);
+            const hrs = Math.floor(totalSec / 3600);
+            const mins = Math.floor((totalSec % 3600) / 60);
+            const secs = totalSec % 60;
+            el.textContent = hrs >= 1
+                ? `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+                : `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        });
     }
 
     tickKdsClock();
     setInterval(tickKdsClock, 1000);
+    setInterval(updateKdsCardTimers, 1000);
 
     // --- UI-only: toggle the account dropdown. Reuses the existing Admin link / Logout
     // form that were already on this page — no new endpoints or behavior added. ---

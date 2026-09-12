@@ -9,7 +9,7 @@
     <div class="page-head">
         <div>
             <span class="eyebrow">Operations</span>
-            <h1 class="headline-lg">Order Management</h1>
+            <h1 class="headline-lg">ORDER MANAGEMENT</h1>
         </div>
         <div class="text-muted mono" style="font-size:13.5px;">
             Total: <strong style="color:var(--on-surface);">@Model.Orders.TotalCount</strong> orders recorded
@@ -190,7 +190,7 @@
                             }
                         </td>
                         <td class="num" style="font-weight:700; color:var(--on-surface);">₹@order.TotalAmount.ToString("0.00")</td>
-                        <td class="num text-muted" style="font-size:12.5px;">@order.CreatedAt.ToString("MMM d, HH:mm")</td>
+                        <td class="num text-muted" style="font-size:12.5px;">@order.CreatedAt.ToIstString("MMM d, h:mm tt")</td>
                         <td style="text-align:right;">
                             <a asp-action="OrderDetails" asp-route-id="@order.OrderID" class="btn btn-secondary btn-sm" style="padding:4px 10px; font-weight:600;">
                                 View Order &rarr;

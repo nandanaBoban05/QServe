@@ -9,7 +9,7 @@
     <div class="page-head">
         <div>
             <span class="eyebrow">Financial Audit</span>
-            <h1 class="headline-lg">Payment Verification Log</h1>
+            <h1 class="headline-lg">PAYMENT VERIFICATION LOG</h1>
         </div>
         <div class="mono text-muted" style="font-size:13.5px;">
             Total: <strong style="color:var(--on-surface);">@Model.TotalCount</strong> entries
@@ -57,7 +57,7 @@
                             </span>
                         </td>
                         <td>@(entry.VerifiedByName ?? "Staff")</td>
-                        <td class="num text-muted" style="text-align:right;">@entry.VerificationTime?.ToString("MMM d, HH:mm")</td>
+                        <td class="num text-muted" style="text-align:right;">@(entry.VerificationTime.HasValue ? entry.VerificationTime.Value.ToIstString("MMM d, h:mm tt") : "-")</td>
                     </tr>
                 }
                 </tbody>

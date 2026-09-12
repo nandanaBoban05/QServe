@@ -9,7 +9,7 @@
     <div class="page-head">
         <div>
             <span class="eyebrow">Financials</span>
-            <h1 class="headline-lg">Payment Records</h1>
+            <h1 class="headline-lg">PAYMENT RECORDS</h1>
         </div>
         <div class="mono text-muted" style="font-size:13.5px;">
             Total: <strong style="color:var(--on-surface);">@Model.Payments.TotalCount</strong> records
@@ -142,7 +142,7 @@
                             }
                             <span class="badge @badgeClass">@payment.PaymentStatus</span>
                         </td>
-                        <td class="num text-muted" style="font-size:12.5px;">@payment.CreatedAt.ToString("MMM d, HH:mm")</td>
+                        <td class="num text-muted" style="font-size:12.5px;">@payment.CreatedAt.ToIstString("MMM d, h:mm tt")</td>
                         <td>
                             @if (payment.VerifiedByUser != null)
                             {

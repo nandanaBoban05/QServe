@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] — QServe</title>
+    <title>@(ViewData["Title"] != null ? $"{ViewData["Title"]} — QServe" : "QServe — Smart Restaurant Management")</title>
+    <meta name="description" content="QServe — Smart Restaurant Management" />
     <link rel="icon" type="image/png" href="~/images/logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,6 +18,17 @@
 </head>
 <body>
     @RenderBody()
+    @{
+        string currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+        string currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+        bool isLoginPage = string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase);
+        bool hideFooter = isLoginPage || (ViewData["HideFooter"] as bool? == true);
+    }
+    @if (!hideFooter)
+    {
+        <partial name="_Footer" />
+    }
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -29,6 +29,8 @@ public class Order
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ApprovedAt { get; set; }
+    [NotMapped]
+    public DateTime? ReadyAt { get; set; }
     public DateTime? ServedAt { get; set; }
 
     // Navigation

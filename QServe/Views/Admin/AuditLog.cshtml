@@ -9,7 +9,7 @@
     <div class="page-head">
         <div>
             <span class="eyebrow">Accountability</span>
-            <h1 class="headline-lg">Audit &amp; Activity Log</h1>
+            <h1 class="headline-lg">AUDIT &amp; ACTIVITY LOG</h1>
         </div>
         <div class="mono text-muted" style="font-size:13.5px;">
             Total: <strong style="color:var(--on-surface);">@Model.Logs.TotalCount</strong> entries recorded
@@ -83,7 +83,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Timestamp (UTC)</th>
+                        <th>Timestamp (IST)</th>
                         <th>Entity</th>
                         <th>Action</th>
                         <th>Performed By</th>
@@ -95,7 +95,7 @@
                 {
                     <tr>
                         <td class="num text-muted" style="white-space:nowrap; font-size:12.5px;">
-                            @log.Timestamp.ToString("MMM d, HH:mm:ss")
+                            @log.Timestamp.ToIstString("MMM d, h:mm tt")
                         </td>
                         <td>
                             <span class="badge badge-neutral">@log.EntityType</span>

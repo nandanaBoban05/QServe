@@ -9,7 +9,7 @@
     <div class="page-head">
         <div>
             <span class="eyebrow">Verification</span>
-            <h1 class="headline-lg">Payment Queue</h1>
+            <h1 class="headline-lg">PAYMENT QUEUE</h1>
         </div>
         <div class="text-muted mono" style="font-size:13.5px;">
             Awaiting Staff Check: <strong style="color:var(--primary);">@Model.Payments.TotalCount</strong> payments
@@ -127,7 +127,7 @@
                         </td>
                         <td><span class="badge badge-neutral">@payment.PaymentMode</span></td>
                         <td class="num" style="font-weight:700; font-size:15px; color:var(--primary);">₹@payment.Amount.ToString("0.00")</td>
-                        <td class="num text-muted" style="font-size:12.5px;">@payment.CreatedAt.ToString("HH:mm")</td>
+                        <td class="num text-muted" style="font-size:12.5px;">@payment.CreatedAt.ToIstTimeString("h:mm tt")</td>
                         <td style="text-align:right; white-space:nowrap;">
                             <!-- View Order Button (Neutral / Outline) -->
                             <a asp-action="OrderDetails" asp-route-id="@payment.OrderID" class="btn btn-outline btn-sm" style="padding:6px 12px; margin-right:4px; font-weight:600;" title="Inspect what customer ordered">
@@ -182,7 +182,7 @@
                     <line x1="12" y1="8" x2="12" y2="12"></line>
                     <line x1="12" y1="16" x2="12.01" y2="16"></line>
                 </svg>
-                <h3 style="margin:0; font-size:18px;">Reject Payment</h3>
+                <h3 style="margin:0; font-size:18px;">REJECT PAYMENT</h3>
             </div>
             <button type="button" onclick="closeRejectModal()" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:16px;">&times;</button>
         </div>

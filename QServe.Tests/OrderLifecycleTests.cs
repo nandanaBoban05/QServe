@@ -720,6 +720,86 @@ public class OrderLifecycleTests
         // Verify payment service was never invoked to create a payment
         paymentServiceMock.Verify(p => p.InitiateOnlinePaymentAsync(It.IsAny<int>()), Times.Never);
     }
+
+    [Theory]
+    [InlineData(OrderStatuses.PendingPayment)]
+    [InlineData(OrderStatuses.Approved)]
+    [InlineData(OrderStatuses.Preparing)]
+    [InlineData(OrderStatuses.Ready)]
+    [InlineData(OrderStatuses.Served)]
+    [InlineData(OrderStatuses.Cancelled)]
+    public async Task Customer_Status_ReturnsMatchingOrderState(string status)
+    {
+        var table = new RestaurantTable { TableNumber = "T1", Capacity = 4, IsActive = true, QRCodeData = "token1" };
+        _db.RestaurantTables.Add(table);
+        await _db.SaveChangesAsync();
+
+        var order = new Order { TableID = table.TableID, OrderStatus = status, TotalAmount = 150 };
+        _db.Orders.Add(order);
+        await _db.SaveChangesAsync();
+
+        var session = _customerController.HttpContext.Session;
+        session.SetString($"token:table:{table.TableID}", "valid_token");
+        session.SetString($"orders:table:{table.TableID}", JsonSerializer.Serialize(new List<int> { order.OrderID }));
+
+        var result = await _customerController.Status(order.OrderID);
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<Order>(viewResult.Model);
+        Assert.Equal(status, model.OrderStatus);
+    }
+
+    [Fact]
+    public async Task Kitchen_LifecycleProgression_ApprovedToPreparingToReadyToServed_SetsTimestampsAndBroadcasts()
+    {
+        var table = new RestaurantTable { TableNumber = "T10", Capacity = 4, IsActive = true, QRCodeData = "token10" };
+        _db.RestaurantTables.Add(table);
+        await _db.SaveChangesAsync();
+
+        var order = new Order
+        {
+            TableID = table.TableID,
+            OrderStatus = OrderStatuses.Approved,
+            ApprovedAt = DateTime.UtcNow.AddMinutes(-5),
+            TotalAmount = 300
+        };
+        _db.Orders.Add(order);
+        await _db.SaveChangesAsync();
+
+        // 1. Mark Preparing
+        var res1 = await _kitchenController.MarkPreparing(order.OrderID);
+        Assert.IsType<RedirectToActionResult>(res1);
+        var o1 = await _db.Orders.FindAsync(order.OrderID);
+        Assert.Equal(OrderStatuses.Preparing, o1!.OrderStatus);
+
+        // 2. Mark Ready (Freezes preparation time)
+        var res2 = await _kitchenController.MarkReady(order.OrderID);
+        Assert.IsType<RedirectToActionResult>(res2);
+        var o2 = await _db.Orders.FindAsync(order.OrderID);
+        Assert.Equal(OrderStatuses.Ready, o2!.OrderStatus);
+        Assert.NotNull(o2.ReadyAt);
+        Assert.True(o2.ReadyAt >= o2.ApprovedAt);
+
+        // 3. Mark Served (Preparation time remains frozen at ReadyAt)
+        var res3 = await _kitchenController.MarkServed(order.OrderID);
+        Assert.IsType<RedirectToActionResult>(res3);
+        var o3 = await _db.Orders.FindAsync(order.OrderID);
+        Assert.Equal(OrderStatuses.Served, o3!.OrderStatus);
+        Assert.NotNull(o3.ServedAt);
+        Assert.Equal(o2.ReadyAt, o3.ReadyAt);
+        Assert.True(o3.ServedAt >= o3.ReadyAt);
+    }
+
+    [Fact]
+    public void DateTimeExtensions_ToIst_ConvertsUtcToIndianStandardTime()
+    {
+        var utcTime = new DateTime(2026, 9, 11, 12, 0, 0, DateTimeKind.Utc);
+        var istTime = QServe.Helpers.DateTimeExtensions.ToIst(utcTime);
+
+        // IST is UTC + 5:30
+        Assert.Equal(17, istTime.Hour);
+        Assert.Equal(30, istTime.Minute);
+        Assert.Contains("IST", QServe.Helpers.DateTimeExtensions.ToIstString(utcTime));
+    }
 }
 
 // In-Memory implementation of ISession for controller testing

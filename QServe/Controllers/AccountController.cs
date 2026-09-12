@@ -83,18 +83,23 @@ public class AccountController : Controller
     // ---- Forgot / Reset Password (self-service) ----
     [HttpGet]
     [AllowAnonymous]
-    public IActionResult ForgotPassword() => View();
+    public IActionResult ForgotPassword(string? email = null)
+    {
+        ViewBag.Email = email;
+        return View();
+    }
 
     [HttpPost]
+    [ActionName("ForgotPassword")]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ForgotPassword(string email)
+    public async Task<IActionResult> ForgotPasswordConfirmed(string email)
     {
         var devLink = await _passwordResetService.RequestResetAsync(email);
 
         ViewBag.Submitted = true;
         ViewBag.DevResetLink = devLink;
-        return View();
+        return View("ForgotPassword");
     }
 
     [HttpGet]
@@ -114,7 +119,7 @@ public class AccountController : Controller
         // Validate that passwords match
         if (newPassword != confirmPassword)
         {
-            ModelState.AddModelError(string.Empty, "Passwords do not match. Please try again.");
+            ModelState.AddModelError(string.Empty, "Passwords do not match.");
             ViewBag.Email = email;
             ViewBag.Token = token;
             return View();

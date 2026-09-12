@@ -4,6 +4,47 @@
 
 <partial name="_AdminNav" />
 
+<style>
+    .password-field {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+        .password-field input {
+            flex: 1;
+            padding-right: 42px;
+        }
+    .password-toggle {
+        position: absolute;
+        right: 10px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--on-surface-muted);
+        padding: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+    }
+        .password-toggle:hover {
+            color: var(--on-surface);
+        }
+    .eye-icon {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+    .required-star {
+        color: var(--error);
+        margin-left: 2px;
+    }
+</style>
+
 <div class="page page--narrow">
     <div class="page-head">
         <div>
@@ -15,7 +56,7 @@
                 Back to Staff List
             </a>
             <span class="eyebrow" style="display:block;">Access Control</span>
-            <h1 class="headline-lg">New Staff Account</h1>
+            <h1 class="headline-lg">NEW STAFF ACCOUNT</h1>
         </div>
     </div>
 
@@ -34,27 +75,49 @@
             @Html.AntiForgeryToken()
 
             <div class="form-group">
-                <label>Full Name</label>
+                <label>Full Name <span class="required-star">*</span></label>
                 <input type="text" name="fullName" placeholder="e.g. John Doe" required autofocus />
+                @if (ViewData.ModelState["fullName"]?.Errors.Any() == true)
+                {
+                    <span class="text-danger" style="font-size:12.5px; margin-top:4px; display:block;">@ViewData.ModelState["fullName"]!.Errors.First().ErrorMessage</span>
+                }
             </div>
 
             <div class="form-group">
-                <label>Email Address</label>
+                <label>Email Address <span class="required-star">*</span></label>
                 <input type="email" name="email" placeholder="staff@restaurant.com" required />
+                @if (ViewData.ModelState["email"]?.Errors.Any() == true)
+                {
+                    <span class="text-danger" style="font-size:12.5px; margin-top:4px; display:block;">@ViewData.ModelState["email"]!.Errors.First().ErrorMessage</span>
+                }
             </div>
 
             <div class="form-group">
-                <label>Temporary Password</label>
-                <input type="password" name="password" required minlength="8" placeholder="Minimum 8 characters" />
+                <label>Temporary Password <span class="required-star">*</span></label>
+                <div class="password-field">
+                    <input type="password" id="password" name="password" required minlength="8" placeholder="Minimum 8 characters" />
+                    <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password', this)" aria-label="Show password" title="Toggle password visibility">
+                        <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                        <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                    </button>
+                </div>
+                @if (ViewData.ModelState["password"]?.Errors.Any() == true)
+                {
+                    <span class="text-danger" style="font-size:12.5px; margin-top:4px; display:block;">@ViewData.ModelState["password"]!.Errors.First().ErrorMessage</span>
+                }
             </div>
 
             <div class="form-group">
-                <label>System Role</label>
+                <label>System Role <span class="required-star">*</span></label>
                 <select name="role" required>
                     <option value="Kitchen">Kitchen (KDS Display Only)</option>
                     <option value="Manager">Manager (Reports, Orders, Payments)</option>
                     <option value="Admin">Admin (Full System Access)</option>
                 </select>
+                @if (ViewData.ModelState["role"]?.Errors.Any() == true)
+                {
+                    <span class="text-danger" style="font-size:12.5px; margin-top:4px; display:block;">@ViewData.ModelState["role"]!.Errors.First().ErrorMessage</span>
+                }
             </div>
 
             <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--surface-container-high); display:flex; gap:12px; justify-content:flex-end;">
@@ -64,3 +127,19 @@
         </form>
     </div>
 </div>
+
+<script>
+    function togglePasswordVisibility(fieldId, button) {
+        if (window.event) window.event.preventDefault();
+        const field = document.getElementById(fieldId);
+        if (!field) return;
+        const isPassword = field.type === 'password';
+        field.type = isPassword ? 'text' : 'password';
+        button.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+        const openIcon = button.querySelector('.eye-icon--open');
+        const closedIcon = button.querySelector('.eye-icon--closed');
+        if (openIcon) openIcon.style.display = isPassword ? 'none' : 'block';
+        if (closedIcon) closedIcon.style.display = isPassword ? 'block' : 'none';
+    }
+</script>
+

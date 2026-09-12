@@ -77,28 +77,28 @@ public class AdminStaffController : Controller
     {
         if (string.IsNullOrWhiteSpace(fullName))
         {
-            ModelState.AddModelError(string.Empty, "Full name is required.");
+            ModelState.AddModelError(nameof(fullName), "Full name is required.");
         }
 
         if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
         {
-            ModelState.AddModelError(string.Empty, "A valid email address is required.");
+            ModelState.AddModelError(nameof(email), "A valid email address is required.");
         }
 
         if (role is not (UserRoles.Admin or UserRoles.Kitchen or UserRoles.Manager))
         {
-            ModelState.AddModelError(string.Empty, "Invalid role.");
+            ModelState.AddModelError(nameof(role), "Invalid role selected.");
         }
 
         if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
         {
-            ModelState.AddModelError(string.Empty, "Password must be at least 8 characters.");
+            ModelState.AddModelError(nameof(password), "Password must be at least 8 characters.");
         }
 
         var existingUser = await _userManager.FindByEmailAsync(email);
         if (existingUser != null)
         {
-            ModelState.AddModelError(string.Empty, "A user with that email already exists.");
+            ModelState.AddModelError(nameof(email), "A user with that email already exists.");
         }
 
         if (!ModelState.IsValid)
