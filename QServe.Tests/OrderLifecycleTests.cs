@@ -790,6 +790,45 @@ public class OrderLifecycleTests
     }
 
     [Fact]
+    public async Task Checkout_WithSameIdempotencyKey_ReturnsExistingOrderWithoutDuplicate()
+    {
+        var category = new MenuCategory { CategoryID = 101, Name = "Mains", IsActive = true };
+        var item = new MenuItem { ItemID = 201, Name = "Biryani", Price = 250, CategoryID = 101, Category = category, IsAvailable = true };
+        var table = new RestaurantTable { TableID = 301, TableNumber = "T-301", QRCodeData = "data", IsActive = true };
+
+        _db.MenuCategories.Add(category);
+        _db.MenuItems.Add(item);
+        _db.RestaurantTables.Add(table);
+        await _db.SaveChangesAsync();
+
+        _customerController.HttpContext.Session.SetString(TableSession.TokenKey(301), "valid-token");
+        await _customerController.AddToCart(301, 201, 2, null);
+
+        var idempotencyKey = "order-idemp-key-12345";
+
+        // First checkout request
+        var res1 = await _customerController.Checkout(301, PaymentModes.Cash, idempotencyKey);
+        var redirect1 = Assert.IsType<RedirectToActionResult>(res1);
+        Assert.Equal(nameof(CustomerController.Status), redirect1.ActionName);
+        var orderId1 = (int)redirect1.RouteValues!["orderId"]!;
+
+        // Total orders in DB should be 1
+        var orderCountAfterFirst = await _db.Orders.CountAsync(o => o.TableID == 301);
+        Assert.Equal(1, orderCountAfterFirst);
+
+        // Duplicate checkout request with same idempotency key (e.g. rapid double click or network retry)
+        var res2 = await _customerController.Checkout(301, PaymentModes.Cash, idempotencyKey);
+        var redirect2 = Assert.IsType<RedirectToActionResult>(res2);
+        Assert.Equal(nameof(CustomerController.Status), redirect2.ActionName);
+        var orderId2 = (int)redirect2.RouteValues!["orderId"]!;
+
+        // Order ID must match and no second order should be inserted
+        Assert.Equal(orderId1, orderId2);
+        var orderCountAfterSecond = await _db.Orders.CountAsync(o => o.TableID == 301);
+        Assert.Equal(1, orderCountAfterSecond);
+    }
+
+    [Fact]
     public void DateTimeExtensions_ToIst_ConvertsUtcToIndianStandardTime()
     {
         var utcTime = new DateTime(2026, 9, 11, 12, 0, 0, DateTimeKind.Utc);

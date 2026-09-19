@@ -1,7 +1,9 @@
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using QServe.Data;
 using QServe.Hubs;
@@ -18,6 +20,22 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // MVC + Razor Views
 builder.Services.AddControllersWithViews();
+
+// Rate Limiting for Authentication endpoints
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("AuthRateLimit", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+});
 
 // Needed so services (QrCodeService, PasswordResetService, EmailTemplateService) can read
 // the current request's scheme/host to build URLs when App:BaseUrl isn't explicitly set —
@@ -124,7 +142,8 @@ builder.Services.AddSession(options =>
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IRealtimeNotifier, RealtimeNotifier>();
 
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>();
 
 var app = builder.Build();
 
@@ -171,7 +190,19 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+// Security Headers (nosniff, SAMEORIGIN, Referrer-Policy)
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-Frame-Options", "SAMEORIGIN");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    await next();
+});
+
 app.UseRouting();
+
+app.UseRateLimiter();
 
 app.UseSession();
 app.UseAuthentication();
@@ -183,43 +214,5 @@ app.MapControllerRoute(
 
 app.MapHub<KitchenHub>("/hubs/kitchen");
 app.MapHealthChecks("/health");
-
-// Automatically ensure RejectionReason column and Payments index are up to date on SQL Server
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    try
-    {
-        if (db.Database.IsSqlServer())
-        {
-            db.Database.ExecuteSqlRaw(@"
-                IF NOT EXISTS (
-                    SELECT 1 FROM sys.columns 
-                    WHERE Name = N'RejectionReason' 
-                    AND Object_ID = Object_ID(N'Payments')
-                )
-                BEGIN
-                    ALTER TABLE Payments ADD RejectionReason NVARCHAR(255) NULL;
-                END;
-
-                IF EXISTS (
-                    SELECT 1 FROM sys.indexes 
-                    WHERE name = N'IX_Payments_OrderID' 
-                    AND object_id = OBJECT_ID(N'Payments') 
-                    AND is_unique = 1
-                )
-                BEGIN
-                    DROP INDEX IX_Payments_OrderID ON Payments;
-                    CREATE INDEX IX_Payments_OrderID ON Payments(OrderID);
-                END;
-            ");
-        }
-    }
-    catch (Exception ex)
-    {
-        var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
-        logger?.LogWarning(ex, "Could not run automated schema update for Payments.RejectionReason.");
-    }
-}
 
 app.Run();
