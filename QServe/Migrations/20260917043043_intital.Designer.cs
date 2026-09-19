@@ -12,8 +12,8 @@ using QServe.Data;
 namespace QServe.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260830125153_seed data")]
-    partial class seeddata
+    [Migration("20260917043043_intital")]
+    partial class intital
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,176 @@ namespace QServe.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<int>", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("NormalizedName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedName")
+                        .IsUnique()
+                        .HasDatabaseName("RoleNameIndex")
+                        .HasFilter("[NormalizedName] IS NOT NULL");
+
+                    b.ToTable("Roles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Admin",
+                            NormalizedName = "ADMIN"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Kitchen",
+                            NormalizedName = "KITCHEN"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Manager",
+                            NormalizedName = "MANAGER"
+                        });
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ClaimType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ClaimValue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("RoleClaims", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<int>", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ClaimType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ClaimValue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserClaims", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<int>", b =>
+                {
+                    b.Property<string>("LoginProvider")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ProviderKey")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ProviderDisplayName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("LoginProvider", "ProviderKey");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserLogins", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<int>", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
+                    b.HasKey("UserId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("UserRoles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            UserId = 1,
+                            RoleId = 1
+                        },
+                        new
+                        {
+                            UserId = 2,
+                            RoleId = 2
+                        },
+                        new
+                        {
+                            UserId = 3,
+                            RoleId = 3
+                        });
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<int>", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LoginProvider")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("UserId", "LoginProvider", "Name");
+
+                    b.ToTable("UserTokens", (string)null);
+                });
 
             modelBuilder.Entity("QServe.Models.AuditLog", b =>
                 {
@@ -104,14 +274,14 @@ namespace QServe.Migrations
                             CategoryID = 2,
                             DisplayOrder = 2,
                             IsActive = true,
-                            Name = "Starters"
+                            Name = "Main Course"
                         },
                         new
                         {
                             CategoryID = 3,
                             DisplayOrder = 3,
                             IsActive = true,
-                            Name = "Main Course"
+                            Name = "Desserts"
                         });
                 });
 
@@ -186,7 +356,7 @@ namespace QServe.Migrations
                         },
                         new
                         {
-                            ItemID = 2,
+                            ItemID = 3,
                             CategoryID = 1,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             ImageUrl = "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500&auto=format&fit=crop&q=60",
@@ -200,119 +370,7 @@ namespace QServe.Migrations
                         },
                         new
                         {
-                            ItemID = 3,
-                            CategoryID = 1,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Beverage",
-                            Name = "Cold Coffee",
-                            PrepTimeMinutes = 5,
-                            Price = 90m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 4,
-                            CategoryID = 2,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Quick",
-                            Name = "Veg Spring Rolls",
-                            PrepTimeMinutes = 10,
-                            Price = 150m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
                             ItemID = 5,
-                            CategoryID = 2,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Cooked",
-                            Name = "Chicken Satay",
-                            PrepTimeMinutes = 15,
-                            Price = 220m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 6,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Cooked",
-                            Name = "Paneer Butter Masala",
-                            PrepTimeMinutes = 20,
-                            Price = 260m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 7,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Cooked",
-                            Name = "Chicken Biryani",
-                            PrepTimeMinutes = 25,
-                            Price = 320m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 8,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Cooked",
-                            Name = "Grilled Fish",
-                            PrepTimeMinutes = 22,
-                            Price = 380m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 9,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1527786356703-4b100091cd2c?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Dessert",
-                            Name = "Gulab Jamun",
-                            PrepTimeMinutes = 5,
-                            Price = 90m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 10,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Dessert",
-                            Name = "Chocolate Brownie",
-                            PrepTimeMinutes = 8,
-                            Price = 140m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 11,
                             CategoryID = 1,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             ImageUrl = "https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=500&auto=format&fit=crop&q=60",
@@ -320,201 +378,19 @@ namespace QServe.Migrations
                             ItemType = "Beverage",
                             Name = "Mango Juice",
                             PrepTimeMinutes = 5,
-                            Price = 80m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 12,
-                            CategoryID = 1,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Beverage",
-                            Name = "Watermelon Juice",
-                            PrepTimeMinutes = 5,
-                            Price = 70m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 13,
-                            CategoryID = 1,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Beverage",
-                            Name = "Iced Tea",
-                            PrepTimeMinutes = 5,
-                            Price = 75m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 14,
-                            CategoryID = 2,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Quick",
-                            Name = "French Fries",
-                            PrepTimeMinutes = 10,
-                            Price = 120m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 15,
-                            CategoryID = 2,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Quick",
-                            Name = "Veg Burger",
-                            PrepTimeMinutes = 12,
-                            Price = 160m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 16,
-                            CategoryID = 2,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Quick",
-                            Name = "Chicken Burger",
-                            PrepTimeMinutes = 15,
-                            Price = 190m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 17,
-                            CategoryID = 2,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1562967914-608f82629710?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Quick",
-                            Name = "Chicken Nuggets",
-                            PrepTimeMinutes = 12,
-                            Price = 180m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 18,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Cooked",
-                            Name = "Veg Fried Rice",
-                            PrepTimeMinutes = 18,
-                            Price = 180m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 19,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Cooked",
-                            Name = "Chicken Fried Rice",
-                            PrepTimeMinutes = 20,
-                            Price = 240m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 20,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1552611052-33e04de081de?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Cooked",
-                            Name = "Veg Noodles",
-                            PrepTimeMinutes = 15,
-                            Price = 170m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 22,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Cooked",
-                            Name = "Butter Chicken",
-                            PrepTimeMinutes = 25,
-                            Price = 340m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 23,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Dessert",
-                            Name = "Chocolate Ice Cream",
-                            PrepTimeMinutes = 3,
-                            Price = 110m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 24,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Dessert",
-                            Name = "Vanilla Ice Cream",
-                            PrepTimeMinutes = 3,
                             Price = 100m,
                             RecentOrdered = 0,
                             TotalOrdered = 0
                         },
                         new
                         {
-                            ItemID = 25,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Dessert",
-                            Name = "Cheesecake",
-                            PrepTimeMinutes = 8,
-                            Price = 180m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 26,
+                            ItemID = 6,
                             CategoryID = 1,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             ImageUrl = "https://images.unsplash.com/photo-1523677011781-c91d1bbe2f9e?w=500&auto=format&fit=crop&q=60",
                             IsAvailable = true,
                             ItemType = "Beverage",
-                            Name = "Masala Buttermilk",
+                            Name = "Lime Juice",
                             PrepTimeMinutes = 3,
                             Price = 50m,
                             RecentOrdered = 0,
@@ -522,41 +398,27 @@ namespace QServe.Migrations
                         },
                         new
                         {
-                            ItemID = 27,
-                            CategoryID = 1,
+                            ItemID = 9,
+                            CategoryID = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1626201850125-18d2d9a17c5b?w=500&auto=format&fit=crop&q=60",
+                            ImageUrl = "https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=60",
                             IsAvailable = true,
-                            ItemType = "Beverage",
-                            Name = "Sweet Lassi",
-                            PrepTimeMinutes = 5,
-                            Price = 80m,
+                            ItemType = "Quick",
+                            Name = "Fish Tawa Fry",
+                            PrepTimeMinutes = 10,
+                            Price = 150m,
                             RecentOrdered = 0,
                             TotalOrdered = 0
                         },
                         new
                         {
-                            ItemID = 28,
-                            CategoryID = 1,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Beverage",
-                            Name = "Mango Lassi",
-                            PrepTimeMinutes = 5,
-                            Price = 100m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 29,
+                            ItemID = 10,
                             CategoryID = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             ImageUrl = "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=500&auto=format&fit=crop&q=60",
                             IsAvailable = true,
                             ItemType = "Quick",
-                            Name = "Samosa",
+                            Name = "Samosa (2 pcs)",
                             PrepTimeMinutes = 8,
                             Price = 60m,
                             RecentOrdered = 0,
@@ -564,13 +426,13 @@ namespace QServe.Migrations
                         },
                         new
                         {
-                            ItemID = 30,
+                            ItemID = 11,
                             CategoryID = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             ImageUrl = "https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=500&auto=format&fit=crop&q=60",
                             IsAvailable = true,
-                            ItemType = "Quick",
-                            Name = "Paneer Tikka",
+                            ItemType = "Cooked",
+                            Name = "Chicken Tikka",
                             PrepTimeMinutes = 15,
                             Price = 220m,
                             RecentOrdered = 0,
@@ -578,21 +440,7 @@ namespace QServe.Migrations
                         },
                         new
                         {
-                            ItemID = 31,
-                            CategoryID = 2,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Quick",
-                            Name = "Chicken 65",
-                            PrepTimeMinutes = 15,
-                            Price = 240m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 32,
+                            ItemID = 12,
                             CategoryID = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             ImageUrl = "https://images.unsplash.com/photo-1625944525533-473f1a3d54e7?w=500&auto=format&fit=crop&q=60",
@@ -606,22 +454,22 @@ namespace QServe.Migrations
                         },
                         new
                         {
-                            ItemID = 33,
-                            CategoryID = 3,
+                            ItemID = 13,
+                            CategoryID = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1601050690117-94f5f6fa8bd5?w=500&auto=format&fit=crop&q=60",
+                            ImageUrl = "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=500&auto=format&fit=crop&q=60",
                             IsAvailable = true,
-                            ItemType = "Quick",
-                            Name = "Kerala Parotta",
-                            PrepTimeMinutes = 5,
-                            Price = 20m,
+                            ItemType = "Cooked",
+                            Name = "Paneer Butter Masala",
+                            PrepTimeMinutes = 20,
+                            Price = 260m,
                             RecentOrdered = 0,
                             TotalOrdered = 0
                         },
                         new
                         {
-                            ItemID = 34,
-                            CategoryID = 3,
+                            ItemID = 14,
+                            CategoryID = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             ImageUrl = "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=500&auto=format&fit=crop&q=60",
                             IsAvailable = true,
@@ -634,8 +482,8 @@ namespace QServe.Migrations
                         },
                         new
                         {
-                            ItemID = 35,
-                            CategoryID = 3,
+                            ItemID = 15,
+                            CategoryID = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             ImageUrl = "https://images.unsplash.com/photo-1596797038530-2c107229654b?w=500&auto=format&fit=crop&q=60",
                             IsAvailable = true,
@@ -648,85 +496,112 @@ namespace QServe.Migrations
                         },
                         new
                         {
-                            ItemID = 36,
-                            CategoryID = 3,
+                            ItemID = 16,
+                            CategoryID = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             ImageUrl = "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=500&auto=format&fit=crop&q=60",
                             IsAvailable = true,
                             ItemType = "Cooked",
-                            Name = "Chicken Curry",
+                            Name = "Butter Chicken",
                             PrepTimeMinutes = 25,
-                            Price = 280m,
+                            Price = 340m,
                             RecentOrdered = 0,
                             TotalOrdered = 0
                         },
                         new
                         {
-                            ItemID = 37,
-                            CategoryID = 3,
+                            ItemID = 17,
+                            CategoryID = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1625944525945-7d8b40f95f69?w=500&auto=format&fit=crop&q=60",
                             IsAvailable = true,
                             ItemType = "Cooked",
-                            Name = "Kerala Fish Curry",
+                            Name = "Kerala Fish Curry (Meen Curry)",
                             PrepTimeMinutes = 25,
-                            Price = 300m,
+                            Price = 320m,
                             RecentOrdered = 0,
                             TotalOrdered = 0
                         },
                         new
                         {
-                            ItemID = 38,
-                            CategoryID = 3,
+                            ItemID = 18,
+                            CategoryID = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             ImageUrl = "https://images.unsplash.com/photo-1545247181-516773cae754?w=500&auto=format&fit=crop&q=60",
                             IsAvailable = true,
                             ItemType = "Cooked",
                             Name = "Mutton Rogan Josh",
-                            PrepTimeMinutes = 30,
+                            PrepTimeMinutes = 35,
                             Price = 420m,
                             RecentOrdered = 0,
                             TotalOrdered = 0
                         },
                         new
                         {
-                            ItemID = 39,
-                            CategoryID = 3,
+                            ItemID = 19,
+                            CategoryID = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=500&auto=format&fit=crop&q=60",
+                            ImageUrl = "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=500&auto=format&fit=crop&q=60",
                             IsAvailable = true,
                             ItemType = "Cooked",
-                            Name = "Appam with Chicken Stew",
+                            Name = "Hyderabadi Chicken Biryani",
+                            PrepTimeMinutes = 30,
+                            Price = 320m,
+                            RecentOrdered = 0,
+                            TotalOrdered = 0
+                        },
+                        new
+                        {
+                            ItemID = 20,
+                            CategoryID = 2,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ImageUrl = "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=500&auto=format&fit=crop&q=60",
+                            IsAvailable = true,
+                            ItemType = "Cooked",
+                            Name = "Veg Fried Rice",
+                            PrepTimeMinutes = 18,
+                            Price = 180m,
+                            RecentOrdered = 0,
+                            TotalOrdered = 0
+                        },
+                        new
+                        {
+                            ItemID = 21,
+                            CategoryID = 2,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ImageUrl = "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=500&auto=format&fit=crop&q=60",
+                            IsAvailable = true,
+                            ItemType = "Cooked",
+                            Name = "Chicken Fried Rice",
                             PrepTimeMinutes = 20,
-                            Price = 250m,
+                            Price = 240m,
                             RecentOrdered = 0,
                             TotalOrdered = 0
                         },
                         new
                         {
-                            ItemID = 40,
+                            ItemID = 23,
                             CategoryID = 3,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=500&auto=format&fit=crop&q=60",
+                            ImageUrl = "https://images.unsplash.com/photo-1593701461250-d7b22dfd3a77?w=500&auto=format&fit=crop&q=60",
                             IsAvailable = true,
                             ItemType = "Dessert",
-                            Name = "Payasam",
-                            PrepTimeMinutes = 5,
-                            Price = 100m,
-                            RecentOrdered = 0,
-                            TotalOrdered = 0
-                        },
-                        new
-                        {
-                            ItemID = 41,
-                            CategoryID = 3,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            ImageUrl = "https://images.unsplash.com/photo-1571115764595-644a1f56a55c?w=500&auto=format&fit=crop&q=60",
-                            IsAvailable = true,
-                            ItemType = "Dessert",
-                            Name = "Rasgulla",
+                            Name = "Gulab Jamun (2 pcs)",
                             PrepTimeMinutes = 5,
                             Price = 90m,
+                            RecentOrdered = 0,
+                            TotalOrdered = 0
+                        },
+                        new
+                        {
+                            ItemID = 25,
+                            CategoryID = 3,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ImageUrl = "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=500&auto=format&fit=crop&q=60",
+                            IsAvailable = true,
+                            ItemType = "Dessert",
+                            Name = "Chocolate Brownie",
+                            PrepTimeMinutes = 8,
+                            Price = 140m,
                             RecentOrdered = 0,
                             TotalOrdered = 0
                         });
@@ -957,22 +832,28 @@ namespace QServe.Migrations
 
             modelBuilder.Entity("QServe.Models.User", b =>
                 {
-                    b.Property<int>("UserID")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserID"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("int");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("bit");
 
                     b.Property<string>("FullName")
                         .IsRequired()
@@ -982,13 +863,22 @@ namespace QServe.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-                    b.Property<DateTime?>("LockoutEnd")
-                        .HasColumnType("datetime2");
+                    b.Property<bool>("LockoutEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("LockoutEnd")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("NormalizedEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("NormalizedUserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("PasswordResetTokenExpiry")
                         .HasColumnType("datetime2");
@@ -996,17 +886,38 @@ namespace QServe.Migrations
                     b.Property<string>("PasswordResetTokenHash")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PhoneNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("PhoneNumberConfirmed")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.HasKey("UserID");
+                    b.Property<string>("SecurityStamp")
+                        .HasColumnType("nvarchar(max)");
 
-                    b.HasIndex("Email")
-                        .IsUnique();
+                    b.Property<bool>("TwoFactorEnabled")
+                        .HasColumnType("bit");
 
-                    b.ToTable("Users", t =>
+                    b.Property<string>("UserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedEmail")
+                        .HasDatabaseName("EmailIndex");
+
+                    b.HasIndex("NormalizedUserName")
+                        .IsUnique()
+                        .HasDatabaseName("UserNameIndex")
+                        .HasFilter("[NormalizedUserName] IS NOT NULL");
+
+                    b.ToTable("Users", null, t =>
                         {
                             t.HasCheckConstraint("CK_Users_Role", "\"Role\" IN ('Admin','Kitchen','Manager')");
                         });
@@ -1014,37 +925,115 @@ namespace QServe.Migrations
                     b.HasData(
                         new
                         {
-                            UserID = 1,
+                            Id = 1,
                             AccessFailedCount = 0,
+                            ConcurrencyStamp = "B166FA12-054A-483A-A6DF-531A3F5B8B9B",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "admin@restaurant.local",
+                            EmailConfirmed = true,
                             FullName = "System Admin",
                             IsActive = true,
-                            PasswordHash = "$2a$11$QMyrjjsBLb7obUvnOtfbiu.H5O0IrMWVqsAOCG0OS4xuUkUsj/ct2",
-                            Role = "Admin"
+                            LockoutEnabled = false,
+                            NormalizedEmail = "ADMIN@RESTAURANT.LOCAL",
+                            NormalizedUserName = "ADMIN@RESTAURANT.LOCAL",
+                            PasswordHash = "AQAAAAIAAYagAAAAEK6uDIJG076xXsQWr/EBvpAVpkif9vdNUMbYDbEWqXLeZBSffqySVTzEep+a2zCkgQ==",
+                            PhoneNumberConfirmed = false,
+                            Role = "Admin",
+                            SecurityStamp = "8D42A1E3-8E5A-40D9-97C5-3C72A99E9801",
+                            TwoFactorEnabled = false,
+                            UserName = "admin@restaurant.local"
                         },
                         new
                         {
-                            UserID = 2,
+                            Id = 2,
                             AccessFailedCount = 0,
+                            ConcurrencyStamp = "C277FB23-165B-594B-B7EC-642B4F6C9CAC",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "kitchen@restaurant.local",
+                            EmailConfirmed = true,
                             FullName = "Kitchen Staff",
                             IsActive = true,
-                            PasswordHash = "$2a$11$iXo607uYZzXx9Lves8pkEeihb0WrXiAYfO0ka./e1.hKTKt3T554W",
-                            Role = "Kitchen"
+                            LockoutEnabled = false,
+                            NormalizedEmail = "KITCHEN@RESTAURANT.LOCAL",
+                            NormalizedUserName = "KITCHEN@RESTAURANT.LOCAL",
+                            PasswordHash = "AQAAAAIAAYagAAAAEF8sfRoTc55iqwy7BVGC+J5VzyMeDHQCLPCH9GjE2ZEy7WFkGVSSL94iEIp+o9/KAg==",
+                            PhoneNumberConfirmed = false,
+                            Role = "Kitchen",
+                            SecurityStamp = "9E53B2F4-9F6B-51EA-08D6-4D83B00F0902",
+                            TwoFactorEnabled = false,
+                            UserName = "kitchen@restaurant.local"
                         },
                         new
                         {
-                            UserID = 3,
+                            Id = 3,
                             AccessFailedCount = 0,
+                            ConcurrencyStamp = "D388FC34-276C-6A5C-C8FD-753C5A7D0DBD",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "manager@restaurant.local",
+                            EmailConfirmed = true,
                             FullName = "Restaurant Manager",
                             IsActive = true,
-                            PasswordHash = "$2a$11$GQqWprbnqdgn/88W318q1.CIMOKhOgJYQo9F.wij6ERJMS4H5hgve",
-                            Role = "Manager"
+                            LockoutEnabled = false,
+                            NormalizedEmail = "MANAGER@RESTAURANT.LOCAL",
+                            NormalizedUserName = "MANAGER@RESTAURANT.LOCAL",
+                            PasswordHash = "AQAAAAIAAYagAAAAEM9rwe3x5+Z3nrOXsnliWWasSaY67sQqAj9ppIQpBC9snQ3yu9sI/gQ8hmsMsmfAfg==",
+                            PhoneNumberConfirmed = false,
+                            Role = "Manager",
+                            SecurityStamp = "0F64C3A5-0A7C-62FB-19E7-5E94C11A1003",
+                            TwoFactorEnabled = false,
+                            UserName = "manager@restaurant.local"
                         });
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
+                {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<int>", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<int>", b =>
+                {
+                    b.HasOne("QServe.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<int>", b =>
+                {
+                    b.HasOne("QServe.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<int>", b =>
+                {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<int>", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("QServe.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<int>", b =>
+                {
+                    b.HasOne("QServe.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("QServe.Models.AuditLog", b =>
