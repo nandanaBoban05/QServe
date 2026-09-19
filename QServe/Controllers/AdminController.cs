@@ -42,24 +42,29 @@ public class AdminController : Controller
         var todayStart = DateTime.UtcNow.Date;
         var yesterdayStart = todayStart.AddDays(-1);
 
-        var todayOrdersQuery = _db.Orders.AsNoTracking()
-            .Where(o => o.CreatedAt >= todayStart);
+        var todayOrdersData = await _db.Orders.AsNoTracking()
+            .Where(o => o.CreatedAt >= todayStart)
+            .Select(o => new
+            {
+                o.OrderStatus,
+                o.TotalAmount,
+                HasOnlineReceived = o.Payments.Any(p => p.PaymentMode == PaymentModes.Online && p.PaymentStatus == PaymentStatuses.Received),
+                HasOfflineReceived = o.Payments.Any(p => p.PaymentMode != PaymentModes.Online && p.PaymentStatus == PaymentStatuses.Received)
+            })
+            .ToListAsync();
 
-        var todayOrderCount = await todayOrdersQuery
-            .CountAsync(o => o.OrderStatus != OrderStatuses.Cancelled);
+        var todayOrderCount = todayOrdersData.Count(o => o.OrderStatus != OrderStatuses.Cancelled);
         var yesterdayRevenue = await _db.Orders.AsNoTracking()
             .Where(o => o.CreatedAt >= yesterdayStart && o.CreatedAt < todayStart && o.OrderStatus != OrderStatuses.Cancelled)
             .SumAsync(o => (decimal?)o.TotalAmount) ?? 0m;
-        var todayCompletedCount = await todayOrdersQuery
-            .CountAsync(o => o.OrderStatus == OrderStatuses.Served);
-        var todayCancelledCount = await todayOrdersQuery
-            .CountAsync(o => o.OrderStatus == OrderStatuses.Cancelled);
-        var todayOnlineRevenue = await todayOrdersQuery
-            .Where(o => o.OrderStatus != OrderStatuses.Cancelled && o.Payments.Any(p => p.PaymentMode == PaymentModes.Online && p.PaymentStatus == PaymentStatuses.Received))
-            .SumAsync(o => (decimal?)o.TotalAmount) ?? 0m;
-        var todayOfflineRevenue = await todayOrdersQuery
-            .Where(o => o.OrderStatus != OrderStatuses.Cancelled && o.Payments.Any(p => p.PaymentMode != PaymentModes.Online && p.PaymentStatus == PaymentStatuses.Received))
-            .SumAsync(o => (decimal?)o.TotalAmount) ?? 0m;
+        var todayCompletedCount = todayOrdersData.Count(o => o.OrderStatus == OrderStatuses.Served);
+        var todayCancelledCount = todayOrdersData.Count(o => o.OrderStatus == OrderStatuses.Cancelled);
+        var todayOnlineRevenue = todayOrdersData
+            .Where(o => o.OrderStatus != OrderStatuses.Cancelled && o.HasOnlineReceived)
+            .Sum(o => o.TotalAmount);
+        var todayOfflineRevenue = todayOrdersData
+            .Where(o => o.OrderStatus != OrderStatuses.Cancelled && o.HasOfflineReceived)
+            .Sum(o => o.TotalAmount);
 
         // "Today's Revenue" is labelled "settled" in the UI, so it must be built from the
         // two Received-payment-only queries above — not a separate, looser query that
@@ -70,23 +75,27 @@ public class AdminController : Controller
             p.PaymentStatus == PaymentStatuses.Pending
             && (p.PaymentMode == PaymentModes.Cash || p.PaymentMode == PaymentModes.Card));
 
-        var pendingPaymentCount = await _db.Orders.AsNoTracking().CountAsync(o =>
-            o.OrderStatus == OrderStatuses.PendingPayment || o.OrderStatus == OrderStatuses.AwaitingVerification);
+        var activeOrderStateSummary = await _db.Orders.AsNoTracking()
+            .Where(o => o.OrderStatus != OrderStatuses.Served && o.OrderStatus != OrderStatuses.Cancelled)
+            .Select(o => o.OrderStatus)
+            .ToListAsync();
+
+        var pendingPaymentCount = activeOrderStateSummary.Count(s =>
+            s == OrderStatuses.PendingPayment || s == OrderStatuses.AwaitingVerification);
 
         var pendingActionCount = pendingVerificationCount + pendingPaymentCount;
 
         // Kitchen order state counts
-        var newOrdersCount = await _db.Orders.AsNoTracking().CountAsync(o =>
-            o.OrderStatus == OrderStatuses.Approved || o.OrderStatus == OrderStatuses.PendingPayment || o.OrderStatus == OrderStatuses.AwaitingVerification);
+        var newOrdersCount = activeOrderStateSummary.Count(s =>
+            s == OrderStatuses.Approved || s == OrderStatuses.PendingPayment || s == OrderStatuses.AwaitingVerification);
 
-        var preparingOrdersCount = await _db.Orders.AsNoTracking().CountAsync(o =>
-            o.OrderStatus == OrderStatuses.Preparing);
+        var preparingOrdersCount = activeOrderStateSummary.Count(s =>
+            s == OrderStatuses.Preparing);
 
-        var readyOrdersCount = await _db.Orders.AsNoTracking().CountAsync(o =>
-            o.OrderStatus == OrderStatuses.Ready);
+        var readyOrdersCount = activeOrderStateSummary.Count(s =>
+            s == OrderStatuses.Ready);
 
-        var activeOrderCount = await _db.Orders.AsNoTracking().CountAsync(o =>
-            o.OrderStatus != OrderStatuses.Served && o.OrderStatus != OrderStatuses.Cancelled);
+        var activeOrderCount = activeOrderStateSummary.Count;
 
         // Active kitchen orders (ordered by oldest/waiting first)
         var activeKitchenOrders = await _db.Orders.AsNoTracking()

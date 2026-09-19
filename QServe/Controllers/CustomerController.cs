@@ -44,7 +44,7 @@ public class CustomerController : Controller
     [HttpGet("table/{tableId:int}")]
     public async Task<IActionResult> Menu(int tableId, string? token = null)
     {
-        token ??= HttpContext.Session.GetString(TokenKey(tableId));
+        token ??= HttpContext.Session.GetString(TableSession.TokenKey(tableId));
 
         if (string.IsNullOrEmpty(token) || !_qrCodeService.ValidateToken(tableId, token))
             return View("InvalidTable");
@@ -53,7 +53,7 @@ public class CustomerController : Controller
         if (table is null || !table.IsActive)
             return View("InvalidTable");
 
-        HttpContext.Session.SetString(TokenKey(tableId), token);
+        HttpContext.Session.SetString(TableSession.TokenKey(tableId), token);
 
         var categories = await _db.MenuCategories
             .Where(c => c.IsActive)
@@ -133,7 +133,7 @@ public class CustomerController : Controller
             });
         }
 
-        return RedirectToAction(nameof(Menu), new { tableId, token = HttpContext.Session.GetString(TokenKey(tableId)) });
+        return RedirectToAction(nameof(Menu), new { tableId, token = HttpContext.Session.GetString(TableSession.TokenKey(tableId)) });
     }
 
     [HttpPost("table/{tableId:int}/cart/update")]
@@ -413,7 +413,7 @@ public class CustomerController : Controller
     [HttpGet("status/{orderId:int}")]
     public async Task<IActionResult> Status(int orderId)
     {
-        var order = await _db.Orders
+        var order = await _db.Orders.AsNoTracking()
             .Include(o => o.Table)
             .Include(o => o.Payments)
             .Include(o => o.OrderItems).ThenInclude(oi => oi.Item)
@@ -464,7 +464,7 @@ public class CustomerController : Controller
 
     private List<int> GetSessionOrderIds(int tableId)
     {
-        var json = HttpContext.Session.GetString(OrdersKey(tableId));
+        var json = HttpContext.Session.GetString(TableSession.OrdersKey(tableId));
         return json is null ? new List<int>() : JsonSerializer.Deserialize<List<int>>(json) ?? new();
     }
 
@@ -474,11 +474,9 @@ public class CustomerController : Controller
         if (!ids.Contains(orderId))
         {
             ids.Add(orderId);
-            HttpContext.Session.SetString(OrdersKey(tableId), JsonSerializer.Serialize(ids));
+            HttpContext.Session.SetString(TableSession.OrdersKey(tableId), JsonSerializer.Serialize(ids));
         }
     }
 
     private static string CartKey(int tableId) => $"cart:table:{tableId}";
-    private static string TokenKey(int tableId) => TableSession.TokenKey(tableId);
-    private static string OrdersKey(int tableId) => TableSession.OrdersKey(tableId);
 }

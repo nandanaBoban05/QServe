@@ -33,7 +33,7 @@ public class AdminStaffController : Controller
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var search = filter.Search.Trim();
-            query = query.Where(u => u.FullName.Contains(search) || u.Email.Contains(search));
+            query = query.Where(u => u.FullName.Contains(search) || (u.Email != null && u.Email.Contains(search)));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Role) && filter.Role != "All")

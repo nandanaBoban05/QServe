@@ -88,7 +88,7 @@ public class AccountSecurityTests
         userManager.RegisterTokenProvider(TokenOptions.DefaultProvider, new EmailTokenProvider<User>());
 
         var roleStore = new RoleStore<IdentityRole<int>, ApplicationDbContext, int>(db);
-        var roleManager = new RoleManager<IdentityRole<int>>(roleStore, null, null, null, null);
+        var roleManager = new RoleManager<IdentityRole<int>>(roleStore, null!, null!, null!, null!);
 
         var contextAccessor = new Mock<IHttpContextAccessor>();
         var claimsFactory = new UserClaimsPrincipalFactory<User, IdentityRole<int>>(userManager, roleManager, userOptions);
@@ -99,8 +99,8 @@ public class AccountSecurityTests
             claimsFactory,
             userOptions,
             Mock.Of<ILogger<SignInManager<User>>>(),
-            null,
-            null);
+            null!,
+            null!);
 
         return (userManager, signInManager);
     }

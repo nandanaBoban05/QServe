@@ -25,14 +25,15 @@
     <!-- SQL Server provider. Swap for Npgsql.EntityFrameworkCore.PostgreSQL if you'd rather use PostgreSQL -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.10" />
 
-    <!-- Auth (Module 2) -->
-    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
-
-    <!-- Real-time (wired up when you build Module 7) -->
-    <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.2.0" />
-
     <!-- QR codes (wired up when you build Module 3) -->
     <PackageReference Include="QRCoder" Version="1.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Views\Account\PasswordResetTemplate.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
