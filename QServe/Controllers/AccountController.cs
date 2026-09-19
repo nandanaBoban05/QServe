@@ -1,7 +1,6 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using QServe.Models;
 using QServe.Services;
@@ -12,11 +11,19 @@ public class AccountController : Controller
 {
     private readonly IAuthService _authService;
     private readonly IPasswordResetService _passwordResetService;
+    private readonly SignInManager<User> _signInManager;
+    private readonly UserManager<User> _userManager;
 
-    public AccountController(IAuthService authService, IPasswordResetService passwordResetService)
+    public AccountController(
+        IAuthService authService,
+        IPasswordResetService passwordResetService,
+        SignInManager<User> signInManager,
+        UserManager<User> userManager)
     {
         _authService = authService;
         _passwordResetService = passwordResetService;
+        _signInManager = signInManager;
+        _userManager = userManager;
     }
 
     [HttpGet]
@@ -39,7 +46,11 @@ public class AccountController : Controller
         switch (outcome.Result)
         {
             case LoginResult.Success:
-                await SignInAsync(outcome.UserId!.Value, outcome.FullName!, outcome.Role!);
+                var user = await _userManager.FindByIdAsync(outcome.UserId!.Value.ToString());
+                if (user != null)
+                {
+                    await _signInManager.SignInAsync(user, isPersistent: false);
+                }
                 return RedirectToRoleHome(outcome.Role);
 
             case LoginResult.AccountLocked:
@@ -61,7 +72,7 @@ public class AccountController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
     {
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        await _signInManager.SignOutAsync();
         return RedirectToAction(nameof(Login));
     }
 
@@ -70,26 +81,25 @@ public class AccountController : Controller
     public IActionResult AccessDenied() => View();
 
     // ---- Forgot / Reset Password (self-service) ----
-    // Admin-assisted reset for staff who can't self-serve still lives in
-    // AdminStaffController.ResetPassword — this is the separate, unauthenticated path a staff
-    // member uses on their own, from the login screen.
-
     [HttpGet]
     [AllowAnonymous]
-    public IActionResult ForgotPassword() => View();
+    public IActionResult ForgotPassword(string? email = null)
+    {
+        ViewBag.Email = email;
+        return View();
+    }
 
     [HttpPost]
+    [ActionName("ForgotPassword")]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ForgotPassword(string email)
+    public async Task<IActionResult> ForgotPasswordConfirmed(string email)
     {
-        // The devLink is null in Production (and null in Development for a non-matching
-        // email) — the view must not treat "no link shown" as proof the email didn't match.
         var devLink = await _passwordResetService.RequestResetAsync(email);
 
         ViewBag.Submitted = true;
         ViewBag.DevResetLink = devLink;
-        return View();
+        return View("ForgotPassword");
     }
 
     [HttpGet]
@@ -109,7 +119,7 @@ public class AccountController : Controller
         // Validate that passwords match
         if (newPassword != confirmPassword)
         {
-            ModelState.AddModelError(string.Empty, "Passwords do not match. Please try again.");
+            ModelState.AddModelError(string.Empty, "Passwords do not match.");
             ViewBag.Email = email;
             ViewBag.Token = token;
             return View();
@@ -127,26 +137,6 @@ public class AccountController : Controller
 
         TempData["LoginMessage"] = "Your password has been reset. Log in with your new password.";
         return RedirectToAction(nameof(Login));
-    }
-
-    private async Task SignInAsync(int userId, string fullName, string role)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, userId.ToString()),
-            new(ClaimTypes.Name, fullName),
-            new(ClaimTypes.Role, role)
-        };
-
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal,
-            new AuthenticationProperties
-            {
-                IsPersistent = false, // session cookie — closes when the browser closes
-                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
-            });
     }
 
     // AUTH-3: redirect by role — Admin/Manager to the dashboard, Kitchen to the KDS.

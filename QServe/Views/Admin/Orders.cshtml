@@ -1,41 +1,208 @@
-@model List<QServe.Models.Order>
+@model QServe.ViewModels.AdminOrderFilterViewModel
 @{
-    ViewData["Title"] = "Order Monitor";
+    ViewData["Title"] = "Order Management";
 }
 
 <partial name="_AdminNav" />
 
 <div class="page">
-    <span class="eyebrow">Live</span>
-    <h1>Active Orders</h1>
+    <div class="page-head">
+        <div>
+            <span class="eyebrow">Operations</span>
+            <h1 class="headline-lg">ORDER MANAGEMENT</h1>
+        </div>
+        <div class="text-muted mono" style="font-size:13.5px;">
+            Total: <strong style="color:var(--on-surface);">@Model.Orders.TotalCount</strong> orders recorded
+        </div>
+    </div>
 
-    <div class="card mt-lg">
-    @if (!Model.Any())
+    <!-- Standardized Filter Card Component -->
+    <div class="filter-card">
+        <form method="get" asp-action="Orders">
+            <div class="filter-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Search Orders</label>
+                    <input type="text" name="Search" value="@Model.Search" placeholder="Order #, notes..." />
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Table</label>
+                    <select name="TableId">
+                        <option value="">All Tables</option>
+                        @foreach (var table in Model.Tables)
+                        {
+                            <option value="@table.TableID" selected="@(Model.TableId == table.TableID ? "selected" : null)">
+                                Table @table.TableNumber
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Order Status</label>
+                    <select name="OrderStatus">
+                        <option value="All" selected="@(Model.OrderStatus == "All" || string.IsNullOrEmpty(Model.OrderStatus) ? "selected" : null)">All Statuses</option>
+                        <option value="Active" selected="@(Model.OrderStatus == "Active" ? "selected" : null)">⚡ Active Live Orders</option>
+                        <option value="PendingPayment" selected="@(Model.OrderStatus == "PendingPayment" ? "selected" : null)">Pending Payment</option>
+                        <option value="AwaitingVerification" selected="@(Model.OrderStatus == "AwaitingVerification" ? "selected" : null)">Awaiting Verification</option>
+                        <option value="Approved" selected="@(Model.OrderStatus == "Approved" ? "selected" : null)">Approved</option>
+                        <option value="Preparing" selected="@(Model.OrderStatus == "Preparing" ? "selected" : null)">Preparing</option>
+                        <option value="Ready" selected="@(Model.OrderStatus == "Ready" ? "selected" : null)">Ready</option>
+                        <option value="Served" selected="@(Model.OrderStatus == "Served" ? "selected" : null)">Served</option>
+                        <option value="Cancelled" selected="@(Model.OrderStatus == "Cancelled" ? "selected" : null)">Cancelled</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Payment Status</label>
+                    <select name="PaymentStatus">
+                        <option value="All" selected="@(Model.PaymentStatus == "All" || string.IsNullOrEmpty(Model.PaymentStatus) ? "selected" : null)">All</option>
+                        <option value="Pending" selected="@(Model.PaymentStatus == "Pending" ? "selected" : null)">Pending</option>
+                        <option value="Processing" selected="@(Model.PaymentStatus == "Processing" ? "selected" : null)">Processing</option>
+                        <option value="Received" selected="@(Model.PaymentStatus == "Received" ? "selected" : null)">Received</option>
+                        <option value="Failed" selected="@(Model.PaymentStatus == "Failed" ? "selected" : null)">Failed</option>
+                        <option value="Refunded" selected="@(Model.PaymentStatus == "Refunded" ? "selected" : null)">Refunded</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Payment Mode</label>
+                    <select name="PaymentMode">
+                        <option value="All" selected="@(Model.PaymentMode == "All" || string.IsNullOrEmpty(Model.PaymentMode) ? "selected" : null)">All Modes</option>
+                        <option value="Online" selected="@(Model.PaymentMode == "Online" ? "selected" : null)">Online (Razorpay)</option>
+                        <option value="Cash" selected="@(Model.PaymentMode == "Cash" ? "selected" : null)">Cash</option>
+                        <option value="Card" selected="@(Model.PaymentMode == "Card" ? "selected" : null)">Card (POS)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Tier</label>
+                    <select name="OrderType">
+                        <option value="All" selected="@(Model.OrderType == "All" || string.IsNullOrEmpty(Model.OrderType) ? "selected" : null)">All Tiers</option>
+                        <option value="Quick" selected="@(Model.OrderType == "Quick" ? "selected" : null)">Quick (&le;10m)</option>
+                        <option value="Regular" selected="@(Model.OrderType == "Regular" ? "selected" : null)">Regular</option>
+                        <option value="Heavy" selected="@(Model.OrderType == "Heavy" ? "selected" : null)">Heavy (&gt;25m)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Date From</label>
+                    <input type="date" name="DateFrom" value="@(Model.DateFrom?.ToString("yyyy-MM-dd"))" />
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Date To</label>
+                    <input type="date" name="DateTo" value="@(Model.DateTo?.ToString("yyyy-MM-dd"))" />
+                </div>
+
+                <div class="filter-actions">
+                    <a asp-action="Orders" class="btn btn-secondary">Reset</a>
+                    <button type="submit" class="btn btn-primary">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                        Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Orders Table Card -->
+    <div class="card" style="padding:0; overflow:hidden;">
+    @if (!Model.Orders.Items.Any())
     {
-        <p class="kds-empty">No active orders right now.</p>
+        <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            <p class="empty-state-text">No orders matching the selected criteria.</p>
+            <a asp-action="Orders" class="btn btn-secondary btn-sm">Reset Filters</a>
+        </div>
     }
     else
     {
-        <table class="data-table">
-            <thead>
-                <tr><th>Order</th><th>Table</th><th>Status</th><th>Tier</th><th>Total</th><th>Placed</th></tr>
-            </thead>
-            <tbody>
-            @foreach (var order in Model)
-            {
-                <tr>
-                    <td class="num">#@order.OrderID</td>
-                    <td>@order.Table?.TableNumber</td>
-                    <td><span class="badge badge-steel">@order.OrderStatus</span></td>
-                    <td>
-                        <span class="badge @(order.OrderType == "Quick" ? "badge-curry" : order.OrderType == "Heavy" ? "badge-tamarind" : "badge-turmeric")">@order.OrderType</span>
-                    </td>
-                    <td class="num">₹@order.TotalAmount.ToString("0.00")</td>
-                    <td class="num">@order.CreatedAt.ToString("HH:mm")</td>
-                </tr>
-            }
-            </tbody>
-        </table>
+        <div class="data-table-container" style="border:none; border-radius:0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Table</th>
+                        <th>Status</th>
+                        <th>Tier</th>
+                        <th>Payment</th>
+                        <th>Total Amount</th>
+                        <th>Placed (UTC)</th>
+                        <th style="text-align:right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var order in Model.Orders.Items)
+                {
+                    <tr>
+                        <td class="num">
+                            <a asp-action="OrderDetails" asp-route-id="@order.OrderID" style="font-weight:700; color:var(--primary); text-decoration:none;">
+                                #@order.OrderID.ToString("D5")
+                            </a>
+                        </td>
+                        <td>
+                            <strong style="color:var(--on-surface);">Table @(order.Table?.TableNumber ?? "-")</strong>
+                        </td>
+                        <td>
+                            @{
+                                string badgeClass = order.OrderStatus switch {
+                                    "Approved" => "badge-approved",
+                                    "Preparing" => "badge-preparing",
+                                    "Ready" => "badge-ready",
+                                    "Served" => "badge-served",
+                                    "Cancelled" => "badge-cancelled",
+                                    "PendingPayment" => "badge-pending",
+                                    "AwaitingVerification" => "badge-awaiting",
+                                    _ => "badge-neutral"
+                                };
+                            }
+                            <span class="badge @badgeClass">@order.OrderStatus</span>
+                        </td>
+                        <td>
+                            <span class="badge @(order.OrderType == "Quick" ? "tier-quick" : order.OrderType == "Heavy" ? "tier-heavy" : "tier-regular")">
+                                @order.OrderType
+                            </span>
+                        </td>
+                        <td>
+                            @{
+                                var pay = order.Payment;
+                            }
+                            @if (pay != null)
+                            {
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <span style="font-size:12.5px; color:var(--on-surface);">@pay.PaymentMode</span>
+                                    <span class="badge @(pay.PaymentStatus == "Received" ? "badge-ready" : pay.PaymentStatus == "Refunded" || pay.PaymentStatus == "Failed" ? "badge-cancelled" : "badge-pending")" style="font-size:10px;">
+                                        @pay.PaymentStatus
+                                    </span>
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-muted" style="font-size:12px;">None</span>
+                            }
+                        </td>
+                        <td class="num" style="font-weight:700; color:var(--on-surface);">₹@order.TotalAmount.ToString("0.00")</td>
+                        <td class="num text-muted" style="font-size:12.5px;">@order.CreatedAt.ToIstString("MMM d, h:mm tt")</td>
+                        <td style="text-align:right;">
+                            <a asp-action="OrderDetails" asp-route-id="@order.OrderID" class="btn btn-secondary btn-sm" style="padding:4px 10px; font-weight:600;">
+                                View Order &rarr;
+                            </a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <partial name="_Pagination" model="Model.Orders" />
     }
     </div>
 </div>

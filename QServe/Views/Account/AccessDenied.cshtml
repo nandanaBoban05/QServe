@@ -2,14 +2,19 @@
     ViewData["Title"] = "Access Denied";
 }
 
-<div class="page page--auth">
-    <div class="auth-card" style="text-align:center;">
-        <img src="~/images/logo.png" alt="QServe" class="brand-logo brand-logo--plain" width="44" height="44" style="margin:0 auto 12px;" />
-        <span class="stamp">Access Denied</span>
-        <p class="text-muted" style="margin:16px 0 20px; font-size:14px;">You don't have permission to view this page.</p>
+<div class="page page--auth" style="text-align:center;">
+    <div class="auth-card">
+        <div style="margin:0 auto 14px; display:inline-block;">
+            <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "180" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
+        </div>
+        <span class="badge badge-cancelled" style="font-size:12px; margin-bottom:12px;">Access Restricted</span>
+        <h1 class="headline-md" style="margin-top:8px; margin-bottom:10px;">ACCESS DENIED</h1>
+        <p class="text-muted" style="margin:0 0 24px; font-size:14px; line-height:1.5;">
+            Your account role does not have permission to view or manage this administrative surface.
+        </p>
         <form asp-controller="Account" asp-action="Logout" method="post">
             @Html.AntiForgeryToken()
-            <button type="submit" class="btn btn-outline btn-block">Log Out</button>
+            <button type="submit" class="btn btn-outline btn-block" style="padding:11px;">Log Out / Switch Account</button>
         </form>
     </div>
 </div>

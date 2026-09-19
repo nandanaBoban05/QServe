@@ -5,31 +5,31 @@
 namespace QServe.Migrations
 {
     /// <inheritdoc />
-    public partial class txt : Migration
+    public partial class initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.UpdateData(
                 table: "Users",
-                keyColumn: "UserID",
+                keyColumn: "Id",
                 keyValue: 1,
                 column: "PasswordHash",
-                value: "$2a$11$kXuZdaLFL/N7Ql7si/bEB.YqvX4BZRHgTZ3eqJM1PQxd8.I/rcBQm");
+                value: "AQAAAAIAAYagAAAAEPF08DvKk5R/zEarz/lCDubkpP26XU3IkY3zje8lS792IukUEi6VMqY7FQZi8KvPpw==");
 
             migrationBuilder.UpdateData(
                 table: "Users",
-                keyColumn: "UserID",
+                keyColumn: "Id",
                 keyValue: 2,
                 column: "PasswordHash",
-                value: "$2a$11$3LZFAGx2iQQjujrZ5a/aGO/PJ/YcwWvkT5B5kDtSqAHc.uEZcANnm");
+                value: "AQAAAAIAAYagAAAAEK3yOJaKzL80fyuTrMsUgi67FDMMK2y7Xy9G03zYCu4U1yuiME80t0ECjy38fSqKxQ==");
 
             migrationBuilder.UpdateData(
                 table: "Users",
-                keyColumn: "UserID",
+                keyColumn: "Id",
                 keyValue: 3,
                 column: "PasswordHash",
-                value: "$2a$11$W33uoBcNZfQbHJam8NPprOyr55RzKbQ31iBcMJcya5g3OThckg28.");
+                value: "AQAAAAIAAYagAAAAEOJhklCtRkjdOuPJzSpY7T88VTNVLrwvBDP9XKDCVbJa4eUNv/d1055mTQwN1XZzhA==");
         }
 
         /// <inheritdoc />
@@ -37,24 +37,24 @@ namespace QServe.Migrations
         {
             migrationBuilder.UpdateData(
                 table: "Users",
-                keyColumn: "UserID",
+                keyColumn: "Id",
                 keyValue: 1,
                 column: "PasswordHash",
-                value: "$2a$11$qeuWfT3Trc9jwgc/c1wiuu976WqXO.Ky7vkyDPXbC8yp49IQW5svi");
+                value: "AQAAAAIAAYagAAAAEAS+V6am5Lwo5aSKAcK/2y1+sQyaqVharM+zj+trMoEaKS8QwXVFIQaIkdfrRmdRJQ==");
 
             migrationBuilder.UpdateData(
                 table: "Users",
-                keyColumn: "UserID",
+                keyColumn: "Id",
                 keyValue: 2,
                 column: "PasswordHash",
-                value: "$2a$11$r/EF2qcOpYImHhRJ/gPanO4wjQQLubCc98GFRmkTl5pCFpZs3GAGG");
+                value: "AQAAAAIAAYagAAAAEF18y93Nqj4h6Do8reKHO344lViz/rIo4f4/o5Q8d/s6zSpXvJD1I9RfFtjVPruzRg==");
 
             migrationBuilder.UpdateData(
                 table: "Users",
-                keyColumn: "UserID",
+                keyColumn: "Id",
                 keyValue: 3,
                 column: "PasswordHash",
-                value: "$2a$11$rwv6qCoAlVJavgawV22e7.HXpQ0dM4sPFpyF7squOu1YKFXOs6JZO");
+                value: "AQAAAAIAAYagAAAAEA8oTHtVwUZk9Z44KLrudqHHNca84qNMbnxMCMwW/eeGzME7uQFhzNU6Ag4U+r5Iyw==");
         }
     }
 }

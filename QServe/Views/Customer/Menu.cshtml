@@ -4,57 +4,370 @@
     int tableId = ViewBag.TableId;
     string token = Context.Session.GetString($"token:table:{tableId}") ?? "";
     var popularItemIds = (HashSet<int>)ViewBag.PopularItemIds;
+    int cartCount = ViewBag.CartCount ?? 0;
+    int priorOrderCount = ViewBag.PriorOrderCount ?? 0;
 }
 
-<div class="ticket-shell">
-    <div class="ticket-brand">
-        <img src="~/images/logo.png" alt="" width="18" height="18" class="brand-logo brand-logo--plain" />
-        <span>QServe</span>
-    </div>
-    <div class="ticket-topline">
-        <span class="table-stamp">TABLE @ViewBag.TableNumber</span>
-        <a class="cart-tab" href="@Url.Action("Cart", new { tableId })">Cart · @ViewBag.CartCount</a>
-    </div>
+<div class="customer-menu" id="customerMenuTop">
 
-    @{ int priorOrderCount = ViewBag.PriorOrderCount; }
+    <!-- ================= HEADER ================= -->
+    <header class="customer-header" id="customerHeader">
+        <div class="customer-header-inner">
+            <div class="customer-logo">
+                <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "120" }, { "LogoClass", "brand-logo" } }' />
+            </div>
+
+            <span class="customer-table-badge">Table @ViewBag.TableNumber</span>
+
+            <div class="customer-header-actions">
+                <button type="button" class="customer-icon-button" id="search-toggle-btn" title="Search Menu" aria-label="Search Menu">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </button>
+
+                <a href="@Url.Action("Cart", new { tableId })" class="customer-icon-button" id="header-cart-btn" aria-label="View cart, @cartCount item@(cartCount == 1 ? "" : "s")">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="9" cy="21" r="1"></circle>
+                        <circle cx="20" cy="21" r="1"></circle>
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                    </svg>
+                    <span class="customer-cart-badge" id="header-cart-badge" style="display:@(cartCount > 0 ? "flex" : "none");">@cartCount</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- ================= SEARCH BAR ================= -->
+        <div class="customer-search-wrap" id="search-wrap">
+            <div class="customer-search-input-box">
+                @* <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg> *@
+                <input type="search" id="menu-search-input" class="customer-search-input" placeholder="Search dishes, drinks, appetizers..." aria-label="Search menu" />
+                <button type="button" class="customer-search-clear" id="search-clear-btn" title="Clear search">&times;</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ================= WELCOME ================= -->
+    <section class="customer-welcome">
+        <h1>WELCOME BACK!</h1>
+        <p>Explore our flavors.</p>
+    </section>
+
     @if (priorOrderCount > 0)
     {
-        <a href="@Url.Action("TableOrders", new { tableId })" class="ticket-card" style="display:flex; justify-content:space-between; align-items:center; text-decoration:none; color:inherit; background:var(--turmeric-tint); border-color:var(--turmeric-deep);">
-            <span style="font-size:13.5px;">
-                <strong>@priorOrderCount</strong> order@(priorOrderCount == 1 ? "" : "s") already placed at this table
+        <a href="@Url.Action("TableOrders", new { tableId })" class="customer-live-orders-banner">
+            <span class="badge badge-ready" style="font-size:11px;">Live</span>
+            <span class="customer-live-orders-text">
+                <strong>@priorOrderCount</strong> active order@(priorOrderCount == 1 ? "" : "s") placed at this table
             </span>
-            <span class="mono" style="font-size:12px; color:var(--turmeric-deep);">View →</span>
+            <span class="customer-live-orders-arrow">View &rarr;</span>
         </a>
     }
 
-    @foreach (var category in Model)
+    <!-- ================= CATEGORY CHIPS ================= -->
+    @if (Model.Count > 1)
     {
-        <h2 class="course-heading">@category.Name</h2>
-        @foreach (var item in category.Items)
+        <nav class="customer-category-list" id="customerCategoryList" aria-label="Menu categories">
+            <button type="button" class="customer-category-chip active" data-category="all">All</button>
+            @foreach (var cat in Model)
+            {
+                <button type="button" class="customer-category-chip" data-category="cat-@cat.CategoryID">
+                    @cat.Name
+                </button>
+            }
+        </nav>
+    }
+
+    <div id="no-search-results" style="display:none; text-align:center; padding:48px 20px;">
+        <p class="text-muted" style="font-size:15px; margin-bottom:14px;">No dishes found matching your search.</p>
+        <button type="button" class="btn btn-secondary btn-sm" id="reset-search-btn" style="border-radius:var(--radius-pill); padding:8px 18px;">Clear Search</button>
+    </div>
+
+    <!-- ================= MENU GRID ================= -->
+    <div class="customer-menu-grid" id="customerMenuGrid">
+        @foreach (var category in Model)
         {
-            <div class="ticket-card">
-                <div class="ticket-card__row">
-                    @if (!string.IsNullOrWhiteSpace(item.ImageUrl))
-                    {
-                        <img src="@item.ImageUrl" alt="@item.Name" class="ticket-card__thumb" onerror="this.remove()" />
-                    }
-                    <div style="flex:1;">
-                        <div class="ticket-card__name">@item.Name</div>
-                        @if (popularItemIds.Contains(item.ItemID))
-                        {
-                            <div class="ticket-card__meta"><span class="stamp stamp-turmeric">Popular</span></div>
-                        }
+            <div id="cat-@category.CategoryID" class="customer-category-section" style="scroll-margin-top:110px;">
+                <h2 class="customer-menu-section-title">@category.Name.ToUpper()</h2>
+
+                @if (!category.Items.Any())
+                {
+                    <p class="text-muted" style="font-size:13px; margin-bottom:16px;">No items currently available in this section.</p>
+                }
+
+                @foreach (var item in category.Items)
+                {
+                    <div class="customer-menu-card @(!item.IsAvailable ? "customer-menu-card--unavailable" : "")" data-item-name="@item.Name.ToLower()" data-item-type="@item.ItemType.ToLower()">
+                        <div class="customer-menu-image-wrap">
+                            <img src="@GetFoodImageUrl(item.Name, item.ImageUrl)" alt="@item.Name" class="customer-menu-image" onerror="this.src='https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500&auto=format&fit=crop&q=60';" />
+
+                            @if (popularItemIds.Contains(item.ItemID))
+                            {
+                                <span class="customer-popular-badge">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.6 7.1L12 17.8 5.8 21.3l1.6-7.1L2 9.5l7.1-.6z" /></svg>
+                                    Popular
+                                </span>
+                            }
+                        </div>
+
+                        <div class="customer-menu-content">
+                            <div class="customer-menu-title-row">
+                                <span class="customer-menu-title">@item.Name</span>
+                                <span class="customer-menu-price">&#8377;@item.Price.ToString("0.00")</span>
+                            </div>
+
+                            <p class="customer-menu-description">@item.ItemType &middot; ~@item.PrepTimeMinutes mins</p>
+
+                            @if (item.IsAvailable)
+                            {
+                                <form asp-action="AddToCart" asp-route-tableId="@tableId" method="post" class="customer-add-form" data-async-add="true">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="itemId" value="@item.ItemID" />
+
+                                    <details class="customer-customize-toggle">
+                                        <summary>Customize (optional)</summary>
+                                        <div class="customer-customize-fields">
+                                            <label class="customer-field-label">
+                                                Qty
+                                                <input type="number" name="quantity" value="1" min="1" max="50" class="customer-qty-input"
+                                                       aria-label="Quantity for @item.Name" />
+                                            </label>
+                                            <input type="text" name="customization" placeholder="Notes (e.g. less spicy, no onions)" class="customer-notes-input"
+                                                   aria-label="Customization notes for @item.Name" />
+                                        </div>
+                                    </details>
+
+                                    <button type="submit" class="customer-add-button" aria-label="Add @item.Name to Cart">
+                                        <span>+</span> Add to Cart
+                                    </button>
+                                </form>
+                            }
+                            else
+                            {
+                                <div class="customer-sold-out">Currently Sold Out</div>
+                            }
+                        </div>
                     </div>
-                    <div class="ticket-card__price">₹@item.Price.ToString("0.00")</div>
-                </div>
-                <form asp-action="AddToCart" asp-route-tableId="@tableId" method="post" class="add-row">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="itemId" value="@item.ItemID" />
-                    <input type="number" name="quantity" value="1" min="1" max="50" class="qty-input" />
-                    <input type="text" name="customization" placeholder="e.g. no onions" class="custom-input" />
-                    <button type="submit" class="btn btn-primary btn-sm">Add</button>
-                </form>
+                }
             </div>
         }
-    }
+    </div>
 </div>
+
+<!-- ================= STICKY BOTTOM CART BAR ================= -->
+<div class="customer-cart-summary" id="bottom-cart-bar" style="display:@(cartCount > 0 ? "block" : "none");">
+    <div class="customer-cart-summary-inner">
+        <div class="customer-cart-summary-count" id="bottom-cart-count">
+            @cartCount item@(cartCount == 1 ? "" : "s") in cart &bull; &#8377;@(((decimal)(ViewBag.CartTotal ?? 0m)).ToString("0.00"))
+        </div>
+        <a href="@Url.Action("Cart", new { tableId })" class="customer-cart-button">
+            View Cart
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+        </a>
+    </div>
+</div>
+
+<script>
+    (function () {
+        // --- 1. Search & Filter State ---
+        const searchToggleBtn = document.getElementById("search-toggle-btn");
+        const searchWrap = document.getElementById("search-wrap");
+        const searchInput = document.getElementById("menu-search-input");
+        const searchClearBtn = document.getElementById("search-clear-btn");
+        const noResults = document.getElementById("no-search-results");
+        const resetSearchBtn = document.getElementById("reset-search-btn");
+        const chips = document.querySelectorAll("#customerCategoryList .customer-category-chip");
+        const catSections = document.querySelectorAll(".customer-category-section");
+        let activeCategory = "all";
+
+        if (searchToggleBtn && searchWrap) {
+            searchToggleBtn.addEventListener("click", function () {
+                const isActive = searchWrap.classList.toggle("active");
+                if (isActive && searchInput) {
+                    searchInput.focus();
+                }
+            });
+        }
+
+        function applyFilters() {
+            const q = searchInput ? (searchInput.value || "").trim().toLowerCase() : "";
+            let anyCardVisible = false;
+
+            if (searchClearBtn) {
+                searchClearBtn.classList.toggle("visible", q.length > 0);
+            }
+
+            catSections.forEach(section => {
+                const isSelectedCategory = (activeCategory === "all" || section.id === activeCategory);
+
+                if (!isSelectedCategory) {
+                    section.style.display = "none";
+                    return;
+                }
+
+                let sectionHasVisibleCard = false;
+                const cards = section.querySelectorAll(".customer-menu-card");
+
+                cards.forEach(card => {
+                    const name = card.dataset.itemName || "";
+                    const type = card.dataset.itemType || "";
+                    const matchesQuery = !q || name.includes(q) || type.includes(q);
+
+                    card.style.display = matchesQuery ? "flex" : "none";
+                    if (matchesQuery) {
+                        sectionHasVisibleCard = true;
+                        anyCardVisible = true;
+                    }
+                });
+
+                // Display section if it matches category and has matching cards or no cards exist yet in category
+                if (q.length > 0) {
+                    section.style.display = sectionHasVisibleCard ? "grid" : "none";
+                } else {
+                    section.style.display = "grid";
+                }
+            });
+
+            if (noResults) {
+                // Only show "no search results" if user actually entered a query and 0 cards match
+                noResults.style.display = (q.length > 0 && !anyCardVisible) ? "block" : "none";
+            }
+        }
+
+        chips.forEach(chip => {
+            chip.addEventListener("click", function (e) {
+                e.preventDefault();
+                chips.forEach(c => c.classList.remove("active"));
+                this.classList.add("active");
+                activeCategory = this.getAttribute("data-category") || "all";
+                applyFilters();
+            });
+        });
+
+        if (searchInput) {
+            searchInput.addEventListener("input", applyFilters);
+        }
+
+        if (searchClearBtn) {
+            searchClearBtn.addEventListener("click", function () {
+                if (searchInput) {
+                    searchInput.value = "";
+                    searchInput.focus();
+                }
+                applyFilters();
+            });
+        }
+
+        if (resetSearchBtn) {
+            resetSearchBtn.addEventListener("click", function () {
+                if (searchInput) {
+                    searchInput.value = "";
+                }
+                activeCategory = "all";
+                chips.forEach(c => c.classList.toggle("active", c.getAttribute("data-category") === "all"));
+                applyFilters();
+            });
+        }
+
+        // --- 2. Interactive AJAX Add-to-Cart ---
+        const addForms = document.querySelectorAll('form[data-async-add="true"]');
+        const headerBadge = document.getElementById("header-cart-badge");
+        const bottomBar = document.getElementById("bottom-cart-bar");
+        const bottomCount = document.getElementById("bottom-cart-count");
+
+        addForms.forEach(form => {
+            form.addEventListener("submit", async function (e) {
+                e.preventDefault();
+                const btn = form.querySelector('button[type="submit"]');
+                const originalHtml = btn ? btn.innerHTML : "";
+
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = "<span>&#10003;</span> Added!";
+                    btn.style.backgroundColor = "var(--primary-container)";
+                    btn.style.color = "var(--on-primary-container)";
+                }
+
+                try {
+                    const formData = new FormData(form);
+                    const res = await fetch(form.action, {
+                        method: "POST",
+                        body: formData,
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest",
+                            "Accept": "application/json"
+                        }
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        const count = data.cartCount || 0;
+
+                        if (headerBadge) {
+                            headerBadge.textContent = count;
+                            headerBadge.style.display = count > 0 ? "flex" : "none";
+                        }
+                        if (bottomBar) {
+                            bottomBar.style.display = count > 0 ? "block" : "none";
+                        }
+                        if (bottomCount) {
+                            const formattedTotal = Number(data.total || 0).toFixed(2);
+                            bottomCount.innerHTML = count + (count === 1 ? " item in cart" : " items in cart") + " &bull; &#8377;" + formattedTotal;
+                        }
+                    } else {
+                        form.submit();
+                    }
+                } catch (err) {
+                    form.submit();
+                } finally {
+                    setTimeout(() => {
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerHTML = originalHtml;
+                            btn.style.backgroundColor = "";
+                            btn.style.color = "";
+                        }
+                    }, 1200);
+                }
+            });
+        });
+    })();
+</script>
+
+@functions {
+    string GetFoodImageUrl(string name, string? customUrl)
+    {
+        if (!string.IsNullOrWhiteSpace(customUrl)) return customUrl;
+        
+        name = (name ?? "").ToLower();
+        if (name.Contains("chai") || name.Contains("tea"))
+            return "https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=500&auto=format&fit=crop&q=60";
+        if (name.Contains("lime") || name.Contains("soda") || name.Contains("lemonade"))
+            return "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500&auto=format&fit=crop&q=60";
+        if (name.Contains("coffee"))
+            return "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=500&auto=format&fit=crop&q=60";
+        if (name.Contains("spring roll") || name.Contains("roll"))
+            return "https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=60";
+        if (name.Contains("satay") || (name.Contains("chicken") && name.Contains("satay")))
+            return "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=500&auto=format&fit=crop&q=60";
+        if (name.Contains("paneer") || name.Contains("masala") || name.Contains("curry"))
+            return "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=500&auto=format&fit=crop&q=60";
+        if (name.Contains("biryani") || name.Contains("rice"))
+            return "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=500&auto=format&fit=crop&q=60";
+        if (name.Contains("fish") || name.Contains("grill"))
+            return "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=500&auto=format&fit=crop&q=60";
+        if (name.Contains("jamun") || name.Contains("sweet"))
+            return "https://images.unsplash.com/photo-1527786356703-4b100091cd2c?w=500&auto=format&fit=crop&q=60";
+        if (name.Contains("brownie") || name.Contains("chocolate"))
+            return "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=500&auto=format&fit=crop&q=60";
+
+        return "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500&auto=format&fit=crop&q=60";
+    }
+}

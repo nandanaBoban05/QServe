@@ -1,58 +1,153 @@
-@model List<QServe.Models.AuditLog>
+@model QServe.ViewModels.AdminAuditLogFilterViewModel
 @{
     ViewData["Title"] = "Audit Log";
-    int currentPage = ViewBag.CurrentPage ?? 1;
-    bool hasNext = ViewBag.HasNextPage ?? false;
-    bool hasPrev = ViewBag.HasPrevPage ?? false;
-    int totalCount = ViewBag.TotalCount ?? 0;
 }
 
 <partial name="_AdminNav" />
 
 <div class="page">
-    <span class="eyebrow">Accountability</span>
-    <h1>Audit Log</h1>
-    <p class="text-muted" style="font-size:13px; margin-top:-8px;">
-        Every recorded state change across the system — @totalCount total entries.
-    </p>
+    <div class="page-head">
+        <div>
+            <span class="eyebrow">Accountability</span>
+            <h1 class="headline-lg">AUDIT &amp; ACTIVITY LOG</h1>
+        </div>
+        <div class="mono text-muted" style="font-size:13.5px;">
+            Total: <strong style="color:var(--on-surface);">@Model.Logs.TotalCount</strong> entries recorded
+        </div>
+    </div>
 
-    <div class="card">
-    @if (!Model.Any())
+    <!-- Standardized Filter Card -->
+    <div class="filter-card">
+        <form method="get" asp-action="AuditLog">
+            <div class="filter-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Search Details / Actor</label>
+                    <input type="text" name="Search" value="@Model.Search" placeholder="Action, Actor, ID..." />
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Entity Type</label>
+                    <select name="EntityType">
+                        <option value="All" selected="@(Model.EntityType == "All" || string.IsNullOrEmpty(Model.EntityType) ? "selected" : null)">All Entities</option>
+                        @foreach (var entity in Model.EntityTypes)
+                        {
+                            <option value="@entity" selected="@(Model.EntityType == entity ? "selected" : null)">@entity</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Action Name</label>
+                    <input type="text" name="ActionName" value="@Model.ActionName" placeholder="e.g. PaymentVerified" />
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>From Date</label>
+                    <input type="date" name="DateFrom" value="@(Model.DateFrom?.ToString("yyyy-MM-dd"))" />
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>To Date</label>
+                    <input type="date" name="DateTo" value="@(Model.DateTo?.ToString("yyyy-MM-dd"))" />
+                </div>
+
+                <div class="filter-actions">
+                    <a asp-action="Orders" class="btn btn-secondary">Reset</a>
+                    <button type="submit" class="btn btn-primary">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                        Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Audit Log Table Card -->
+    <div class="card" style="padding:0; overflow:hidden;">
+    @if (!Model.Logs.Items.Any())
     {
-        <p class="kds-empty">No audit entries yet.</p>
+        <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <p class="empty-state-text">No audit entries matching the selected criteria.</p>
+            <a asp-action="AuditLog" class="btn btn-secondary btn-sm">Reset Filters</a>
+        </div>
     }
     else
     {
-        <table class="data-table">
-            <thead><tr><th>When</th><th>Entity</th><th>Action</th><th>By</th><th>Details</th></tr></thead>
-            <tbody>
-            @foreach (var log in Model)
-            {
-                <tr>
-                    <td class="num" style="white-space:nowrap;">@log.Timestamp.ToString("MMM d, HH:mm:ss")</td>
-                    <td><span class="badge badge-steel">@log.EntityType</span> <span class="num text-muted">#@log.EntityID</span></td>
-                    <td>@log.Action</td>
-                    <td>@(log.PerformedByUser?.FullName ?? "System")</td>
-                    <td style="max-width:320px; font-size:11.5px; color:var(--ink-faint);">
-                        @if (!string.IsNullOrEmpty(log.NewValue))
-                        {
-                            <span class="mono">@log.NewValue</span>
-                        }
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
-
-        <div class="flex-between mt-lg">
-            <a class="btn btn-outline btn-sm @(hasPrev ? "" : "disabled")"
-                   href="@(hasPrev ? Url.Action("AuditLog", new { page = currentPage - 1 }) : "#")"
-               style="@(hasPrev ? "" : "opacity:0.4; pointer-events:none;")">← Newer</a>
-                <span class="text-muted mono" style="font-size:12px;">Page @currentPage</span>
-            <a class="btn btn-outline btn-sm"
-                   href="@(hasNext ? Url.Action("AuditLog", new { page = currentPage + 1 }) : "#")"
-               style="@(hasNext ? "" : "opacity:0.4; pointer-events:none;")">Older →</a>
+        <div class="data-table-container" style="border:none; border-radius:0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp (IST)</th>
+                        <th>Entity</th>
+                        <th>Action</th>
+                        <th>Performed By</th>
+                        <th>Audit Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var log in Model.Logs.Items)
+                {
+                    <tr>
+                        <td class="num text-muted" style="white-space:nowrap; font-size:12.5px;">
+                            @log.Timestamp.ToIstString("MMM d, h:mm tt")
+                        </td>
+                        <td>
+                            <span class="badge badge-neutral">@log.EntityType</span>
+                            @if (log.EntityType == "Orders" && log.EntityID > 0)
+                            {
+                                <a asp-action="OrderDetails" asp-route-id="@log.EntityID" class="num" style="font-weight:700; color:var(--primary); text-decoration:none; margin-left:4px;">
+                                    #@log.EntityID.ToString("D5")
+                                </a>
+                            }
+                            else
+                            {
+                                <span class="num text-muted" style="margin-left:4px;">#@log.EntityID</span>
+                            }
+                        </td>
+                        <td>
+                            <strong style="color:var(--on-surface); font-size:13.5px;">@log.Action.Replace("_", " ")</strong>
+                        </td>
+                        <td>
+                            @if (log.PerformedByUser != null)
+                            {
+                                <span style="font-size:13px; font-weight:500;">@log.PerformedByUser.FullName</span>
+                                <span class="badge badge-neutral" style="font-size:10px; margin-left:4px;">@log.PerformedByUser.Role</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted" style="font-size:12.5px;">System / Customer</span>
+                            }
+                        </td>
+                        <td style="font-size:12.5px; max-width:340px;">
+                            @if (!string.IsNullOrEmpty(log.OldValue) && !string.IsNullOrEmpty(log.NewValue))
+                            {
+                                <span class="text-muted">Changed:</span>
+                                <span class="mono" style="color:var(--error); text-decoration:line-through;">@log.OldValue</span>
+                                <span style="margin:0 2px;">&rarr;</span>
+                                <span class="mono" style="color:var(--status-ready-text); font-weight:600;">@log.NewValue</span>
+                            }
+                            else if (!string.IsNullOrEmpty(log.NewValue))
+                            {
+                                <span class="mono" style="word-break:break-all;">@log.NewValue</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
         </div>
+
+        <partial name="_Pagination" model="Model.Logs" />
     }
     </div>
 </div>

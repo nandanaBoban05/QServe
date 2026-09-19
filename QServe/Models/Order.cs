@@ -29,11 +29,26 @@ public class Order
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ApprovedAt { get; set; }
+    [NotMapped]
+    public DateTime? ReadyAt { get; set; }
     public DateTime? ServedAt { get; set; }
 
     // Navigation
     public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
-    public Payment? Payment { get; set; }
+    public ICollection<Payment> Payments { get; set; } = new List<Payment>();
+
+    [NotMapped]
+    public Payment? Payment
+    {
+        get => Payments?.OrderByDescending(p => p.PaymentID).FirstOrDefault();
+        set
+        {
+            if (value != null && Payments != null && !Payments.Contains(value))
+            {
+                Payments.Add(value);
+            }
+        }
+    }
 }
 
 public static class OrderStatuses

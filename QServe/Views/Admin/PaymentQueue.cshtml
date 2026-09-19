@@ -1,57 +1,255 @@
-@model List<QServe.Models.Payment>
+@model QServe.ViewModels.AdminPaymentQueueFilterViewModel
 @{
     ViewData["Title"] = "Payment Verification Queue";
 }
 
 <partial name="_AdminNav" />
 
-<div class="page page--narrow">
-    <span class="eyebrow">Verification</span>
-    <h1>Payment Queue</h1>
+<div class="page">
+    <div class="page-head">
+        <div>
+            <span class="eyebrow">Verification</span>
+            <h1 class="headline-lg">PAYMENT QUEUE</h1>
+        </div>
+        <div class="text-muted mono" style="font-size:13.5px;">
+            Awaiting Staff Check: <strong style="color:var(--primary);">@Model.Payments.TotalCount</strong> payments
+        </div>
+    </div>
 
-    <div class="card mt-lg">
-    @if (!Model.Any())
+    @if (TempData["PaymentQueueMessage"] is string message)
     {
-        <p class="kds-empty">Nothing waiting on verification right now.</p>
+        <div class="card" style="background:var(--status-ready-bg); border-color:var(--status-ready-border); padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--status-ready-text)" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span style="font-size:13.5px; color:var(--status-ready-text); font-weight:500;">@message</span>
+        </div>
+    }
+
+    <!-- Standardized Filter Card -->
+    <div class="filter-card">
+        <form method="get" asp-action="PaymentQueue" id="paymentQueueFilterForm">
+            <div class="filter-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Search Queue</label>
+                    <input type="text" name="Search" value="@Model.Search" placeholder="Table, Order #, Pay ID..." />
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Payment Mode</label>
+                    <select name="PaymentMode">
+                        <option value="All" selected="@(Model.PaymentMode == "All" || string.IsNullOrEmpty(Model.PaymentMode) ? "selected" : null)">All Offline Modes</option>
+                        <option value="Cash" selected="@(Model.PaymentMode == "Cash" ? "selected" : null)">Cash at Table</option>
+                        <option value="Card" selected="@(Model.PaymentMode == "Card" ? "selected" : null)">POS Card Swiped</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>From Date</label>
+                    <input type="date" name="DateFrom" value="@(Model.DateFrom?.ToString("yyyy-MM-dd"))" />
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>To Date</label>
+                    <input type="date" name="DateTo" value="@(Model.DateTo?.ToString("yyyy-MM-dd"))" />
+                </div>
+
+                <div class="filter-actions">
+                    <a asp-action="PaymentQueue" class="btn btn-secondary" style="height:38px; padding:0 16px;">Reset</a>
+                    <button type="submit" class="btn btn-primary" style="height:38px; padding:0 20px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                        Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Payments Queue Table Card -->
+    <div class="card" style="padding:0; overflow:hidden;">
+    @if (!Model.Payments.Items.Any())
+    {
+        <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            <p class="empty-state-text">No payments are currently waiting on staff verification.</p>
+            @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.PaymentMode) || Model.DateFrom.HasValue || Model.DateTo.HasValue)
+            {
+                <a asp-action="PaymentQueue" class="btn btn-secondary btn-sm">Reset Filters</a>
+            }
+        </div>
     }
     else
     {
-        <table class="data-table">
-            <thead>
-                <tr><th>Table</th><th>Mode</th><th>Amount</th><th>Placed</th><th>Action</th></tr>
-            </thead>
-            <tbody>
-            @foreach (var payment in Model)
-            {
-                <tr>
-                    <td>@payment.Order?.Table?.TableNumber</td>
-                    <td><span class="badge badge-steel">@payment.PaymentMode</span></td>
-                    <td class="num">₹@payment.Amount.ToString("0.00")</td>
-                    <td class="num">@payment.CreatedAt.ToString("HH:mm")</td>
-                    <td>
-                        <form asp-action="VerifyPayment" method="post" style="display:inline;">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="paymentId" value="@payment.PaymentID" />
-                            <input type="hidden" name="approve" value="true" />
-                            <button type="submit" class="btn btn-primary btn-sm">Approve</button>
-                        </form>
-                        <form asp-action="VerifyPayment" method="post" style="display:inline;">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="paymentId" value="@payment.PaymentID" />
-                            <input type="hidden" name="approve" value="false" />
-                            <button type="submit" class="btn btn-danger btn-sm">Reject</button>
-                        </form>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
+        <div class="data-table-container" style="border:none; border-radius:0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Order</th>
+                        <th>Table</th>
+                        <th>Ordered Items</th>
+                        <th>Mode</th>
+                        <th>Amount</th>
+                        <th>Placed (UTC)</th>
+                        <th style="text-align:right;">Staff Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var payment in Model.Payments.Items)
+                {
+                    <tr>
+                        <td class="num">
+                            <a asp-action="OrderDetails" asp-route-id="@payment.OrderID" style="font-weight:700; color:var(--primary); text-decoration:none;">
+                                #@payment.OrderID.ToString("D5")
+                            </a>
+                            <div style="font-size:11px; color:var(--on-surface-variant); margin-top:2px;">
+                                Pay #@payment.PaymentID
+                            </div>
+                        </td>
+                        <td>
+                            <strong style="font-size:14.5px; color:var(--on-surface);">Table @(payment.Order?.Table?.TableNumber ?? "-")</strong>
+                        </td>
+                        <td style="max-width:280px;">
+                            @if (payment.Order?.OrderItems != null && payment.Order.OrderItems.Any())
+                            {
+                                <div style="font-size:13px; color:var(--on-surface); line-height:1.4;">
+                                    @string.Join(", ", payment.Order.OrderItems.Select(i => $"{i.Quantity}× {(i.Item?.Name ?? "Item #" + i.ItemID)}"))
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-muted" style="font-size:12px;">Order details</span>
+                            }
+                        </td>
+                        <td><span class="badge badge-neutral">@payment.PaymentMode</span></td>
+                        <td class="num" style="font-weight:700; font-size:15px; color:var(--primary);">₹@payment.Amount.ToString("0.00")</td>
+                        <td class="num text-muted" style="font-size:12.5px;">@payment.CreatedAt.ToIstTimeString("h:mm tt")</td>
+                        <td style="text-align:right; white-space:nowrap;">
+                            <!-- View Order Button (Neutral / Outline) -->
+                            <a asp-action="OrderDetails" asp-route-id="@payment.OrderID" class="btn btn-outline btn-sm" style="padding:6px 12px; margin-right:4px; font-weight:600;" title="Inspect what customer ordered">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                View Order
+                            </a>
+
+                            <!-- Verify Button (Positive / Primary) -->
+                            <form asp-action="VerifyPayment" method="post" style="display:inline;" onsubmit="return handlePaymentAction(this);">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="paymentId" value="@payment.PaymentID" />
+                                <input type="hidden" name="approve" value="true" />
+                                <button type="submit" class="btn btn-primary btn-sm" style="margin-right:4px; padding:6px 14px;" title="Approve payment &amp; send to kitchen">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                    Verify
+                                </button>
+                            </form>
+
+                            <!-- Reject Button (Destructive / Error with reason modal) -->
+                            <button type="button" class="btn btn-outline btn-sm" style="color:var(--error); border-color:var(--error); padding:6px 12px;"
+                                    onclick="openRejectModal('@payment.PaymentID', '@payment.OrderID', '@payment.Amount.ToString("0.00")', '@(payment.Order?.Table?.TableNumber ?? "-")')">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                                Reject
+                            </button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <partial name="_Pagination" model="Model.Payments" />
     }
+    </div>
+</div>
+
+<!-- Modal for Payment Rejection Reason -->
+<div id="rejectModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:16px;">
+    <div class="card" style="max-width:480px; width:100%; box-shadow:var(--shadow-lg); border-radius:var(--radius-xl); animation:popIn 0.2s ease-out;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:8px; color:var(--error);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <h3 style="margin:0; font-size:18px;">REJECT PAYMENT</h3>
+            </div>
+            <button type="button" onclick="closeRejectModal()" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:16px;">&times;</button>
+        </div>
+
+        <p style="font-size:14px; color:var(--on-surface-variant); margin-bottom:16px;">
+            Reject payment for <strong id="modalOrderInfo" style="color:var(--on-surface);">Order #00000</strong> (<span id="modalTableInfo">Table T01</span>) of amount <strong id="modalAmountInfo" style="color:var(--primary);">₹0.00</strong>.
+            The customer will be notified with the reason and offered the option to retry payment.
+        </p>
+
+        <form asp-action="VerifyPayment" method="post" id="rejectForm" onsubmit="return handlePaymentAction(this);">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="paymentId" id="modalPaymentId" value="" />
+            <input type="hidden" name="approve" value="false" />
+
+            <div class="form-group">
+                <label style="font-weight:600;">Rejection Reason</label>
+                <select id="reasonPreset" onchange="applyReasonPreset(this)" style="margin-bottom:8px;">
+                    <option value="">-- Choose Common Reason or Type Below --</option>
+                    <option value="Cash amount not received at table">Cash amount not received at table</option>
+                    <option value="Card transaction declined on POS terminal">Card transaction declined on POS terminal</option>
+                    <option value="Incorrect currency or damaged notes">Incorrect currency or damaged notes</option>
+                    <option value="Customer requested to change payment method">Customer requested to change payment method</option>
+                    <option value="Customer cancelled payment attempt">Customer cancelled payment attempt</option>
+                </select>
+                <input type="text" name="rejectionReason" id="modalRejectionReason" placeholder="Enter reason (visible to customer)..." required maxlength="250" />
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeRejectModal()">Cancel</button>
+                <button type="submit" class="btn btn-danger">Confirm Rejection</button>
+            </div>
+        </form>
     </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
 <script>
+    function handlePaymentAction(form) {
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            btn.innerHTML = '<span style="display:inline-block; animation:spin 1s linear infinite;">↻</span> Processing...';
+        }
+        return true;
+    }
+
+    function openRejectModal(paymentId, orderId, amount, table) {
+        document.getElementById('modalPaymentId').value = paymentId;
+        document.getElementById('modalOrderInfo').textContent = 'Order #' + orderId.toString().padStart(5, '0');
+        document.getElementById('modalTableInfo').textContent = 'Table ' + table;
+        document.getElementById('modalAmountInfo').textContent = '₹' + amount;
+        document.getElementById('modalRejectionReason').value = 'Cash amount not received at table';
+        document.getElementById('reasonPreset').selectedIndex = 1;
+        document.getElementById('rejectModal').style.display = 'flex';
+    }
+
+    function closeRejectModal() {
+        document.getElementById('rejectModal').style.display = 'none';
+    }
+
+    function applyReasonPreset(select) {
+        if (select.value) {
+            document.getElementById('modalRejectionReason').value = select.value;
+        }
+    }
+
     const connection = new signalR.HubConnectionBuilder()
         .withUrl("/hubs/kitchen")
         .withAutomaticReconnect()

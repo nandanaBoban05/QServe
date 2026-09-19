@@ -2,11 +2,20 @@
     ViewData["Title"] = "Table Not Available";
 }
 
-<div class="page page--auth" style="text-align:center;">
-    <div class="auth-card">
-        <img src="~/images/logo.png" alt="QServe" class="brand-logo brand-logo--plain" width="40" height="40" style="margin:0 auto 12px;" />
-        <span class="stamp">Void</span>
-        <h1 style="font-size:20px; margin-top:14px;">This table isn't available</h1>
-        <p class="text-muted" style="font-size:14px;">The QR code you scanned may be out of date, or this table isn't currently in service. Please ask a staff member for help.</p>
+<div class="page page--auth" style="display:flex; justify-content:center; align-items:center; min-height: calc(100vh - 120px); padding:24px 16px;">
+    <div class="auth-card" style="width:100%; max-width:440px; text-align:center; display:flex; flex-direction:column; align-items:center; padding:32px 24px; box-shadow:var(--shadow-md); border-radius:var(--radius-xl); background:var(--surface);">
+        <div style="margin-bottom:20px; display:flex; justify-content:center; width:100%;">
+            <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "180" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
+        </div>
+        <div style="margin-bottom:12px;">
+            <span class="badge badge-cancelled" style="font-size:12px; padding:4px 12px; display:inline-block;">Notice</span>
+        </div>
+        <h1 class="headline-md" style="margin:0 0 12px 0; font-size:22px; color:var(--on-surface);">TABLE NOT AVAILABLE</h1>
+        <p class="text-muted" style="font-size:14px; line-height:1.6; margin:0 0 24px 0; max-width:380px;">
+            The QR code you scanned is no longer active or the table is currently unavailable. Please re-scan the QR code placed at your table or speak to a restaurant server for assistance.
+        </p>
+        <div style="width:100%; background:var(--surface-container-low); border:1px solid var(--outline-subtle); border-radius:var(--radius-default); padding:14px; font-size:13px; color:var(--on-surface-variant); text-align:center; user-select:none; -webkit-user-select:none;">
+            QServe &middot; Smart Restaurant Management
+        </div>
     </div>
 </div>

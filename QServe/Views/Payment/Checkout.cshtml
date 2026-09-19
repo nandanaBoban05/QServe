@@ -1,16 +1,34 @@
 @model QServe.Services.RazorpayCheckoutInfo
 @{
-    ViewData["Title"] = "Pay for your order";
+    ViewData["Title"] = "Complete Payment";
 }
 
 <div class="page page--auth" style="text-align:center;">
-    <div class="auth-card">
-        <img src="~/images/logo.png" alt="QServe" class="brand-logo brand-logo--plain" width="40" height="40" style="margin:0 auto 10px;" />
-        <span class="table-stamp mono">ORDER #@Model.OrderId.ToString("D6")</span>
-        <p class="mono" style="font-size:22px; margin:16px 0 22px;">₹@((Model.AmountInPaise / 100m).ToString("0.00"))</p>
+    <div class="auth-card" style="max-width:460px;">
+        <div style="margin:0 auto 14px; display:inline-block;">
+            <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "180" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
+        </div>
+        <span class="table-stamp mono">ORDER #@Model.OrderId.ToString("D5")</span>
 
-        <button id="pay-btn" class="btn btn-primary btn-block" style="padding:14px;">Pay Now</button>
-        <p id="pay-status" style="color:var(--tamarind); font-size:13px; margin-top:12px;"></p>
+        <div style="margin:24px 0; padding:20px; background:var(--surface-container-low); border:1px solid var(--outline-subtle); border-radius:var(--radius-lg);">
+            <span class="eyebrow" style="font-size:11px;">Total Amount Payable</span>
+            <p class="mono" style="font-size:32px; font-weight:800; margin:6px 0 0; color:var(--primary);">
+                ₹@((Model.AmountInPaise / 100m).ToString("0.00"))
+            </p>
+        </div>
+
+        <button id="pay-btn" class="btn btn-primary btn-block" style="padding:16px; font-size:16px; font-weight:700; border-radius:var(--radius-pill); box-shadow:0 6px 20px rgba(245, 158, 11, 0.35);">
+            Pay Now with Razorpay
+        </button>
+
+        <div id="pay-status" style="margin-top:16px; font-size:13.5px; min-height:22px; font-weight:500;"></div>
+
+        <div style="margin-top:24px; border-top:1px solid var(--surface-container-high); padding-top:16px;">
+            <a href="/order/status/@Model.OrderId" style="font-size:13px; color:var(--on-surface-variant); text-decoration:none;">
+                &larr; Return to Live Order Status
+            </a>
+        </div>
+
         @Html.AntiForgeryToken()
     </div>
 </div>
@@ -18,8 +36,14 @@
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
     const antiforgeryToken = document.querySelector('input[name="__RequestVerificationToken"]').value;
+    const payBtn = document.getElementById("pay-btn");
+    const payStatus = document.getElementById("pay-status");
 
-    document.getElementById("pay-btn").addEventListener("click", function () {
+    payBtn.addEventListener("click", function () {
+        payBtn.disabled = true;
+        payBtn.textContent = "Opening Secure Checkout...";
+        payStatus.textContent = "";
+
         const options = {
             key: "@Model.KeyId",
             amount: "@Model.AmountInPaise",
@@ -27,46 +51,59 @@
             name: "QServe",
             description: "Order #@Model.OrderId",
             order_id: "@Model.RazorpayOrderId",
-            handler: async function (response) {
-                const res = await fetch("/payment/confirm", {
-                    method: "POST",
-                    headers: { 
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "RequestVerificationToken": antiforgeryToken
-                    },
-                    body: new URLSearchParams({
-                        orderId: "@Model.OrderId",
-                        razorpayOrderId: response.razorpay_order_id,
-                        razorpayPaymentId: response.razorpay_payment_id,
-                        razorpaySignature: response.razorpay_signature,
-                        __RequestVerificationToken: antiforgeryToken
-                    })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    window.location.href = "/order/status/@Model.OrderId";
-                } else {
-                    document.getElementById("pay-status").textContent = "Payment verification failed. Please contact staff.";
-                }
+            theme: {
+                color: "#f59e0b"
             },
-            modal: {
-                ondismiss: function () {
-                    fetch("/payment/failed", {
+            handler: async function (response) {
+                payStatus.textContent = "Verifying payment with restaurant...";
+                try {
+                    const res = await fetch("/payment/confirm", {
                         method: "POST",
-                        headers: {
+                        headers: { 
                             "Content-Type": "application/x-www-form-urlencoded",
                             "RequestVerificationToken": antiforgeryToken
                         },
                         body: new URLSearchParams({
                             orderId: "@Model.OrderId",
+                            razorpayOrderId: response.razorpay_order_id,
+                            razorpayPaymentId: response.razorpay_payment_id,
+                            razorpaySignature: response.razorpay_signature,
                             __RequestVerificationToken: antiforgeryToken
                         })
                     });
-                    document.getElementById("pay-status").textContent = "Payment cancelled.";
+                    const data = await res.json();
+                    if (data.success) {
+                        window.location.href = "/order/status/@Model.OrderId";
+                    } else {
+                        payBtn.disabled = false;
+                        payBtn.textContent = "Retry Payment";
+                        payStatus.style.color = "var(--error)";
+                        payStatus.textContent = "Payment verification failed. Please ask staff for assistance.";
+                    }
+                } catch (err) {
+                    payBtn.disabled = false;
+                    payBtn.textContent = "Retry Payment";
+                    payStatus.style.color = "var(--error)";
+                    payStatus.textContent = "Network error while confirming payment. Please retry.";
+                }
+            },
+            modal: {
+                ondismiss: function () {
+                    payBtn.disabled = false;
+                    payBtn.textContent = "Pay Now with Razorpay";
+                    payStatus.style.color = "var(--on-surface-variant)";
+                    payStatus.textContent = "Payment window closed. Click Pay Now when you are ready.";
                 }
             }
         };
+
         const rzp = new Razorpay(options);
+        rzp.on('payment.failed', function (resp) {
+            payBtn.disabled = false;
+            payBtn.textContent = "Retry Payment";
+            payStatus.style.color = "var(--error)";
+            payStatus.textContent = "Payment was not completed: " + (resp.error?.description || "Gateway error");
+        });
         rzp.open();
     });
 </script>

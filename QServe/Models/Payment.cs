@@ -35,6 +35,10 @@ public class Payment
 
     public DateTime? VerificationTime { get; set; }
 
+    // Staff rejection reason if payment was not approved
+    [MaxLength(255)]
+    public string? RejectionReason { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 

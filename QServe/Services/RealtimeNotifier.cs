@@ -12,9 +12,18 @@ public class RealtimeNotifier : IRealtimeNotifier
         _hub = hub;
     }
 
-    public Task BroadcastOrderStatusUpdateAsync(OrderStatusUpdateDto update) =>
-        _hub.Clients.All.SendAsync("OrderStatusUpdate", update);
+    public async Task BroadcastOrderStatusUpdateAsync(OrderStatusUpdateDto update)
+    {
+        // 1. Target the specific customer order group
+        await _hub.Clients.Group($"Order_{update.OrderID}").SendAsync("OrderStatusUpdate", update);
 
-    public Task BroadcastPaymentPendingAsync(PaymentPendingDto pending) =>
-        _hub.Clients.All.SendAsync("PaymentPendingVerification", pending);
+        // 2. Target staff (Kitchen / Admin / Manager dashboards)
+        await _hub.Clients.Group("Staff").SendAsync("OrderStatusUpdate", update);
+    }
+
+    public async Task BroadcastPaymentPendingAsync(PaymentPendingDto pending)
+    {
+        // Staff-only notification for pending cash/card payment verification
+        await _hub.Clients.Group("Staff").SendAsync("PaymentPendingVerification", pending);
+    }
 }

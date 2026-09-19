@@ -1,13 +1,14 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using QServe.Models;
 
 namespace QServe.Data;
 
-public class ApplicationDbContext : DbContext
+public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<int>, int>
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
-    public DbSet<User> Users => Set<User>();
     public DbSet<RestaurantTable> RestaurantTables => Set<RestaurantTable>();
     public DbSet<MenuCategory> MenuCategories => Set<MenuCategory>();
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
@@ -23,10 +24,17 @@ public class ApplicationDbContext : DbContext
         // ---- Users ----
         modelBuilder.Entity<User>(e =>
         {
-            e.HasIndex(u => u.Email).IsUnique();
+            e.ToTable("Users");
             e.ToTable(t => t.HasCheckConstraint("CK_Users_Role",
                 "\"Role\" IN ('Admin','Kitchen','Manager')"));
         });
+
+        modelBuilder.Entity<IdentityRole<int>>(e => e.ToTable("Roles"));
+        modelBuilder.Entity<IdentityUserRole<int>>(e => e.ToTable("UserRoles"));
+        modelBuilder.Entity<IdentityUserClaim<int>>(e => e.ToTable("UserClaims"));
+        modelBuilder.Entity<IdentityUserLogin<int>>(e => e.ToTable("UserLogins"));
+        modelBuilder.Entity<IdentityUserToken<int>>(e => e.ToTable("UserTokens"));
+        modelBuilder.Entity<IdentityRoleClaim<int>>(e => e.ToTable("RoleClaims"));
 
         // ---- RestaurantTables ----
         modelBuilder.Entity<RestaurantTable>(e =>
@@ -93,11 +101,11 @@ public class ApplicationDbContext : DbContext
         // ---- Payments ----
         modelBuilder.Entity<Payment>(e =>
         {
-            e.HasIndex(p => p.OrderID).IsUnique(); // one payment per order
+            e.HasIndex(p => p.OrderID); // Non-unique index for fast order lookup & multiple attempts
 
             e.HasOne(p => p.Order)
-             .WithOne(o => o.Payment)
-             .HasForeignKey<Payment>(p => p.OrderID)
+             .WithMany(o => o.Payments)
+             .HasForeignKey(p => p.OrderID)
              .OnDelete(DeleteBehavior.Cascade);
 
             e.HasOne(p => p.VerifiedByUser)
@@ -127,42 +135,76 @@ public class ApplicationDbContext : DbContext
 
     private static void SeedData(ModelBuilder modelBuilder)
     {
-        // BCrypt hashes for default dev accounts (Admin123!, Kitchen123!, Manager123!).
-        // Change these passwords before any shared or production deployment.
-        modelBuilder.Entity<User>().HasData(new User
-        {
-            UserID = 1,
-            FullName = "System Admin",
-            Email = "admin@restaurant.local",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
-            Role = UserRoles.Admin,
-            IsActive = true,
-            CreatedAt = new DateTime(2026, 1, 1),
-            AccessFailedCount = 0
-        },
-         new User
-         {
-             UserID = 2,
-             FullName = "Kitchen Staff",
-             Email = "kitchen@restaurant.local",
-             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Kitchen123!"),
-             Role = UserRoles.Kitchen,
-             IsActive = true,
-             CreatedAt = new DateTime(2026, 1, 1),
-             AccessFailedCount = 0
-         },
+        // ASP.NET Core Identity roles & user hashes for default dev accounts (Admin123!, Kitchen123!, Manager123!).
+        modelBuilder.Entity<IdentityRole<int>>().HasData(
+            new IdentityRole<int> { Id = 1, Name = QServe.Models.UserRoles.Admin, NormalizedName = QServe.Models.UserRoles.Admin.ToUpperInvariant() },
+            new IdentityRole<int> { Id = 2, Name = QServe.Models.UserRoles.Kitchen, NormalizedName = QServe.Models.UserRoles.Kitchen.ToUpperInvariant() },
+            new IdentityRole<int> { Id = 3, Name = QServe.Models.UserRoles.Manager, NormalizedName = QServe.Models.UserRoles.Manager.ToUpperInvariant() }
+        );
 
-        new User
+        var hasher = new PasswordHasher<User>();
+
+        var adminUser = new User
         {
-            UserID = 3,
-            FullName = "Restaurant Manager",
-            Email = "manager@restaurant.local",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Manager123!"),
-            Role = UserRoles.Manager,
+            Id = 1,
+            FullName = "System Admin",
+            UserName = "admin@restaurant.local",
+            NormalizedUserName = "ADMIN@RESTAURANT.LOCAL",
+            Email = "admin@restaurant.local",
+            NormalizedEmail = "ADMIN@RESTAURANT.LOCAL",
+            EmailConfirmed = true,
+            Role = QServe.Models.UserRoles.Admin,
             IsActive = true,
             CreatedAt = new DateTime(2026, 1, 1),
-            AccessFailedCount = 0
-        });
+            AccessFailedCount = 0,
+            SecurityStamp = "8D42A1E3-8E5A-40D9-97C5-3C72A99E9801",
+            ConcurrencyStamp = "B166FA12-054A-483A-A6DF-531A3F5B8B9B"
+        };
+        adminUser.PasswordHash = hasher.HashPassword(adminUser, "Admin123!");
+
+        var kitchenUser = new User
+        {
+            Id = 2,
+            FullName = "Kitchen Staff",
+            UserName = "kitchen@restaurant.local",
+            NormalizedUserName = "KITCHEN@RESTAURANT.LOCAL",
+            Email = "kitchen@restaurant.local",
+            NormalizedEmail = "KITCHEN@RESTAURANT.LOCAL",
+            EmailConfirmed = true,
+            Role = QServe.Models.UserRoles.Kitchen,
+            IsActive = true,
+            CreatedAt = new DateTime(2026, 1, 1),
+            AccessFailedCount = 0,
+            SecurityStamp = "9E53B2F4-9F6B-51EA-08D6-4D83B00F0902",
+            ConcurrencyStamp = "C277FB23-165B-594B-B7EC-642B4F6C9CAC"
+        };
+        kitchenUser.PasswordHash = hasher.HashPassword(kitchenUser, "Kitchen123!");
+
+        var managerUser = new User
+        {
+            Id = 3,
+            FullName = "Restaurant Manager",
+            UserName = "manager@restaurant.local",
+            NormalizedUserName = "MANAGER@RESTAURANT.LOCAL",
+            Email = "manager@restaurant.local",
+            NormalizedEmail = "MANAGER@RESTAURANT.LOCAL",
+            EmailConfirmed = true,
+            Role = QServe.Models.UserRoles.Manager,
+            IsActive = true,
+            CreatedAt = new DateTime(2026, 1, 1),
+            AccessFailedCount = 0,
+            SecurityStamp = "0F64C3A5-0A7C-62FB-19E7-5E94C11A1003",
+            ConcurrencyStamp = "D388FC34-276C-6A5C-C8FD-753C5A7D0DBD"
+        };
+        managerUser.PasswordHash = hasher.HashPassword(managerUser, "Manager123!");
+
+        modelBuilder.Entity<User>().HasData(adminUser, kitchenUser, managerUser);
+
+        modelBuilder.Entity<IdentityUserRole<int>>().HasData(
+            new IdentityUserRole<int> { UserId = 1, RoleId = 1 },
+            new IdentityUserRole<int> { UserId = 2, RoleId = 2 },
+            new IdentityUserRole<int> { UserId = 3, RoleId = 3 }
+        );
 
         var tables = new[] { "T01", "T02", "T03", "T04", "T05" };
         for (int i = 0; i < tables.Length; i++)
@@ -171,8 +213,7 @@ public class ApplicationDbContext : DbContext
             {
                 TableID = i + 1,
                 TableNumber = tables[i],
-                QRCodeData = $"https://localhost/order/table/{i + 1}", // regenerate via Module 3 once tokens exist
-                Capacity = 4,
+                QRCodeData = string.Empty, // populated on first Admin -> Tables -> Generate/Regenerate QR     
                 IsActive = true
             });
         }
@@ -184,16 +225,47 @@ public class ApplicationDbContext : DbContext
         );
 
         modelBuilder.Entity<MenuItem>().HasData(
-            new MenuItem { ItemID = 1, CategoryID = 1, Name = "Masala Chai", Price = 40, ItemType = ItemTypes.Beverage, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1) },
-            new MenuItem { ItemID = 2, CategoryID = 1, Name = "Fresh Lime Soda", Price = 60, ItemType = ItemTypes.Beverage, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1) },
-            new MenuItem { ItemID = 3, CategoryID = 1, Name = "Cold Coffee", Price = 90, ItemType = ItemTypes.Beverage, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1) },
-            new MenuItem { ItemID = 4, CategoryID = 2, Name = "Veg Spring Rolls", Price = 150, ItemType = ItemTypes.Quick, PrepTimeMinutes = 10, CreatedAt = new DateTime(2026, 1, 1) },
-            new MenuItem { ItemID = 5, CategoryID = 2, Name = "Chicken Satay", Price = 220, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 15, CreatedAt = new DateTime(2026, 1, 1) },
-            new MenuItem { ItemID = 6, CategoryID = 3, Name = "Paneer Butter Masala", Price = 260, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 20, CreatedAt = new DateTime(2026, 1, 1) },
-            new MenuItem { ItemID = 7, CategoryID = 3, Name = "Chicken Biryani", Price = 320, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 25, CreatedAt = new DateTime(2026, 1, 1) },
-            new MenuItem { ItemID = 8, CategoryID = 3, Name = "Grilled Fish", Price = 380, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 22, CreatedAt = new DateTime(2026, 1, 1) },
-            new MenuItem { ItemID = 9, CategoryID = 3, Name = "Gulab Jamun", Price = 90, ItemType = ItemTypes.Dessert, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1) },
-            new MenuItem { ItemID = 10, CategoryID = 3, Name = "Chocolate Brownie", Price = 140, ItemType = ItemTypes.Dessert, PrepTimeMinutes = 8, CreatedAt = new DateTime(2026, 1, 1) }
-        );
+            new MenuItem { ItemID = 1, CategoryID = 1, Name = "Masala Chai", Price = 40, ItemType = ItemTypes.Beverage, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 2, CategoryID = 1, Name = "Fresh Lime Soda", Price = 60, ItemType = ItemTypes.Beverage, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 3, CategoryID = 1, Name = "Cold Coffee", Price = 90, ItemType = ItemTypes.Beverage, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 4, CategoryID = 2, Name = "Veg Spring Rolls", Price = 150, ItemType = ItemTypes.Quick, PrepTimeMinutes = 10, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1544025162-d76694265947?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 5, CategoryID = 2, Name = "Chicken Satay", Price = 220, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 15, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 6, CategoryID = 3, Name = "Paneer Butter Masala", Price = 260, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 20, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 7, CategoryID = 3, Name = "Chicken Biryani", Price = 320, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 25, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 8, CategoryID = 3, Name = "Grilled Fish", Price = 380, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 22, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 9, CategoryID = 3, Name = "Gulab Jamun", Price = 90, ItemType = ItemTypes.Dessert, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1527786356703-4b100091cd2c?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 10, CategoryID = 3, Name = "Chocolate Brownie", Price = 140, ItemType = ItemTypes.Dessert, PrepTimeMinutes = 8, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 11, CategoryID = 1, Name = "Mango Juice", Price = 80, ItemType = ItemTypes.Beverage, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 12, CategoryID = 1, Name = "Watermelon Juice", Price = 70, ItemType = ItemTypes.Beverage, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 13, CategoryID = 1, Name = "Iced Tea", Price = 75, ItemType = ItemTypes.Beverage, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 14, CategoryID = 2, Name = "French Fries", Price = 120, ItemType = ItemTypes.Quick, PrepTimeMinutes = 10, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 15, CategoryID = 2, Name = "Veg Burger", Price = 160, ItemType = ItemTypes.Quick, PrepTimeMinutes = 12, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 16, CategoryID = 2, Name = "Chicken Burger", Price = 190, ItemType = ItemTypes.Quick, PrepTimeMinutes = 15, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 17, CategoryID = 2, Name = "Chicken Nuggets", Price = 180, ItemType = ItemTypes.Quick, PrepTimeMinutes = 12, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1562967914-608f82629710?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 18, CategoryID = 3, Name = "Veg Fried Rice", Price = 180, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 18, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 19, CategoryID = 3, Name = "Chicken Fried Rice", Price = 240, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 20, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 20, CategoryID = 3, Name = "Veg Noodles", Price = 170, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 15, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1552611052-33e04de081de?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 22, CategoryID = 3, Name = "Butter Chicken", Price = 340, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 25, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 23, CategoryID = 3, Name = "Chocolate Ice Cream", Price = 110, ItemType = ItemTypes.Dessert, PrepTimeMinutes = 3, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 24, CategoryID = 3, Name = "Vanilla Ice Cream", Price = 100, ItemType = ItemTypes.Dessert, PrepTimeMinutes = 3, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 25, CategoryID = 3, Name = "Cheesecake", Price = 180, ItemType = ItemTypes.Dessert, PrepTimeMinutes = 8, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 26, CategoryID = 1, Name = "Masala Buttermilk", Price = 50, ItemType = ItemTypes.Beverage, PrepTimeMinutes = 3, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1523677011781-c91d1bbe2f9e?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 27, CategoryID = 1, Name = "Sweet Lassi", Price = 80, ItemType = ItemTypes.Beverage, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1626201850125-18d2d9a17c5b?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 28, CategoryID = 1, Name = "Mango Lassi", Price = 100, ItemType = ItemTypes.Beverage, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 29, CategoryID = 2, Name = "Samosa", Price = 60, ItemType = ItemTypes.Quick, PrepTimeMinutes = 8, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 30, CategoryID = 2, Name = "Paneer Tikka", Price = 220, ItemType = ItemTypes.Quick, PrepTimeMinutes = 15, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 31, CategoryID = 2, Name = "Chicken 65", Price = 240, ItemType = ItemTypes.Quick, PrepTimeMinutes = 15, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 32, CategoryID = 2, Name = "Vegetable Pakora", Price = 100, ItemType = ItemTypes.Quick, PrepTimeMinutes = 10, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1625944525533-473f1a3d54e7?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 33, CategoryID = 3, Name = "Kerala Parotta", Price = 20, ItemType = ItemTypes.Quick, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1601050690117-94f5f6fa8bd5?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 34, CategoryID = 3, Name = "Kadai Paneer", Price = 280, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 20, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 35, CategoryID = 3, Name = "Palak Paneer", Price = 260, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 20, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1596797038530-2c107229654b?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 36, CategoryID = 3, Name = "Chicken Curry", Price = 280, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 25, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 37, CategoryID = 3, Name = "Kerala Fish Curry", Price = 300, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 25, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1625944525945-7d8b40f95f69?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 38, CategoryID = 3, Name = "Mutton Rogan Josh", Price = 420, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 30, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1545247181-516773cae754?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 39, CategoryID = 3, Name = "Appam with Chicken Stew", Price = 250, ItemType = ItemTypes.Cooked, PrepTimeMinutes = 20, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 40, CategoryID = 3, Name = "Payasam", Price = 100, ItemType = ItemTypes.Dessert, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=500&auto=format&fit=crop&q=60" },
+            new MenuItem { ItemID = 41, CategoryID = 3, Name = "Rasgulla", Price = 90, ItemType = ItemTypes.Dessert, PrepTimeMinutes = 5, CreatedAt = new DateTime(2026, 1, 1), ImageUrl = "https://images.unsplash.com/photo-1571115764595-644a1f56a55c?w=500&auto=format&fit=crop&q=60" }
+                    );
+
     }
 }

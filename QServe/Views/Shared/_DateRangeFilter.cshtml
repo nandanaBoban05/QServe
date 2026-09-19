@@ -1,15 +1,28 @@
 @{
-    DateTime rangeStart = ViewBag.RangeStart;
-    DateTime rangeEnd = ViewBag.RangeEnd;
+    DateTime rangeStart = ViewBag.RangeStart != null ? (DateTime)ViewBag.RangeStart : DateTime.UtcNow.Date.AddDays(-7);
+    DateTime rangeEnd = ViewBag.RangeEnd != null ? (DateTime)ViewBag.RangeEnd : DateTime.UtcNow.Date;
+    string currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "Sales";
 }
-<form method="get" class="field-row" style="margin-bottom:22px;">
-    <div class="form-group" style="margin-bottom:0;">
-        <label>From</label>
-        <input type="date" name="start" value="@rangeStart.ToString("yyyy-MM-dd")" />
-    </div>
-    <div class="form-group" style="margin-bottom:0;">
-        <label>To</label>
-        <input type="date" name="end" value="@rangeEnd.ToString("yyyy-MM-dd")" />
-    </div>
-    <button type="submit" class="btn btn-outline btn-sm">Apply</button>
-</form>
+<div class="filter-card">
+    <form method="get" asp-controller="AdminReports" asp-action="@currentAction">
+        <div class="filter-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+            <div class="form-group" style="margin-bottom:0;">
+                <label>From Date</label>
+                <input type="date" name="start" value="@rangeStart.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label>To Date</label>
+                <input type="date" name="end" value="@rangeEnd.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="filter-actions">
+                <a asp-controller="AdminReports" asp-action="@currentAction" class="btn btn-secondary" style="height:38px; padding:0 18px;">Reset</a>
+                <button type="submit" class="btn btn-primary" style="height:38px; padding:0 22px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                    </svg>
+                    Apply Filter
+                </button>
+            </div>
+        </div>
+    </form>
+</div>

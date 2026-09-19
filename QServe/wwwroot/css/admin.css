@@ -1,0 +1,347 @@
+/* =========================================================================
+   QSERVE DESIGN SYSTEM — ADMIN STYLES
+   Exact Reference: Light Sidebar, 1280px Container, Soft Neutral Surfaces
+   ========================================================================= */
+
+/* =========================================================================
+   1. ADMIN SIDEBAR NAVIGATION (Light Theme)
+   ========================================================================= */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 256px;
+  height: 100vh;
+  background-color: var(--surface-container-lowest); /* #ffffff */
+  color: var(--on-surface);                          /* #1a1c1c */
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);                          /* 16px */
+  overflow-y: auto;
+  z-index: 100;
+  border-right: 1px solid var(--outline-variant);    /* #d8c3ad */
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);                              /* 8px */
+  padding: var(--space-xs) var(--space-xs) var(--space-lg);
+  text-decoration: none;
+}
+
+.sidebar__brand-icon {
+  font-size: 28px;
+  color: var(--primary);
+}
+
+.sidebar__brand-name {
+  font-family: var(--font-family);
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  color: var(--primary);
+  line-height: 1.2;
+}
+
+/* User Card Component in Sidebar */
+.sidebar__user-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: var(--space-md);
+  background-color: var(--surface-container);        /* #eeeeed */
+  border-radius: var(--radius-lg);                   /* 8px */
+}
+
+.sidebar__user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--surface-variant);          /* #e2e2e2 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary);                           /* #625d5b */
+  flex-shrink: 0;
+}
+
+.sidebar__user-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-surface);                          /* #1a1c1c */
+  line-height: 1.3;
+}
+
+.sidebar__user-role {
+  font-size: 11px;
+  color: var(--on-surface-variant);                  /* #534434 */
+  line-height: 1.2;
+}
+
+/* Sidebar Navigation Links */
+.sidebar__links {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.sidebar a.sidebar__link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--on-surface-variant); /* #534434 */
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    padding: 10px 14px;
+    border-radius: var(--radius-lg); /* 8px */
+    transition: all var(--transition-normal);
+}
+
+.sidebar a.sidebar__link .material-symbols-outlined,
+.sidebar a.sidebar__link .nav-icon {
+  font-size: 20px;
+  color: var(--on-surface-variant);
+  transition: color var(--transition-fast);
+}
+
+.sidebar a.sidebar__link:hover {
+  color: var(--on-surface);
+  background-color: var(--surface-container-high);   /* #e8e8e7 */
+}
+
+.sidebar a.sidebar__link.active {
+  color: var(--on-primary-container);                /* #613b00 */
+  background-color: var(--primary-container);        /* #f59e0b */
+  font-weight: 700;
+}
+
+.sidebar a.sidebar__link.active .material-symbols-outlined,
+.sidebar a.sidebar__link.active .nav-icon {
+  color: var(--on-primary-container);
+  font-variation-settings: 'FILL' 1, 'wght' 700, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Sidebar Footer / Action */
+.sidebar__footer {
+  margin-top: auto;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--surface-container);
+}
+
+.sidebar__logout-form {
+  margin: 0;
+}
+
+.sidebar__logout {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: var(--surface-container-low);
+  color: var(--on-surface-variant);
+  border: 1px solid var(--outline-variant);
+  padding: 9px 14px;
+  border-radius: var(--radius-lg);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.sidebar__logout:hover {
+  background-color: var(--surface-container-high);
+  color: var(--on-surface);
+  border-color: var(--outline);
+}
+
+/* =========================================================================
+   2. MAIN CONTENT WRAPPER
+   ========================================================================= */
+.sidebar ~ .page {
+  margin-left: 256px;
+  max-width: calc(100% - 256px);
+  min-height: 100vh;
+  padding: var(--gutter-desktop) var(--gutter-desktop) var(--space-3xl);
+  background-color: var(--background);
+}
+
+.sidebar ~ .app-footer {
+  margin-left: 256px;
+  width: calc(100% - 256px);
+}
+
+.page {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: var(--gutter-desktop) var(--gutter-desktop) var(--space-3xl);
+}
+
+.page--narrow {
+  max-width: 680px;
+}
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: var(--space-lg);
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  display: block;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+}
+
+/* =========================================================================
+   3. RESPONSIVE COLLAPSIBLE SIDEBAR — off-canvas drawer on mobile
+   ========================================================================= */
+
+/* Toggle checkbox: invisible, drives the drawer via :checked + CSS siblings */
+.sidebar-toggle-input {
+    display: none;
+}
+
+/* Hidden on desktop; only appear below the breakpoint */
+.mobile-topbar,
+.sidebar-backdrop,
+.sidebar__close {
+    display: none;
+}
+
+@media (max-width: 992px) {
+    .mobile-topbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        position: sticky;
+        top: 0;
+        z-index: 150;
+        background-color: var(--surface-container-lowest);
+        border-bottom: 1px solid var(--outline-variant);
+        padding: 10px var(--margin-mobile);
+    }
+
+    .mobile-topbar__hamburger {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        border-radius: var(--radius-lg);
+        background-color: var(--surface-container-low);
+        color: var(--on-surface);
+        cursor: pointer;
+        transition: background-color var(--transition-fast);
+    }
+
+        .mobile-topbar__hamburger:hover {
+            background-color: var(--surface-container-high);
+        }
+
+    .mobile-topbar__logo {
+        height: 28px;
+        width: auto;
+    }
+
+    /* Sidebar becomes an off-canvas drawer, hidden until toggled open */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 272px;
+        max-width: 82vw;
+        height: 100vh;
+        flex-direction: column;
+        overflow-x: hidden;
+        overflow-y: auto;
+        border-right: 1px solid var(--outline-variant);
+        border-bottom: none;
+        transform: translateX(-100%);
+        transition: transform var(--transition-normal);
+        z-index: 200;
+    }
+
+    .sidebar__close {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-full);
+        background-color: var(--surface-container-low);
+        color: var(--on-surface-variant);
+        cursor: pointer;
+    }
+
+    .sidebar__links {
+        flex-direction: column;
+        overflow-x: visible;
+        padding: 0;
+    }
+
+    .sidebar a.sidebar__link {
+        white-space: normal;
+        padding: 10px 14px;
+    }
+
+    .sidebar__footer {
+        border-top: 1px solid var(--surface-container);
+        padding-top: var(--space-md);
+        margin-left: 0;
+    }
+
+    /* Dimmed backdrop, tap to close */
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background-color: rgba(26, 28, 28, 0.45);
+        z-index: 190;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity var(--transition-normal);
+    }
+
+    /* Drawer open state, driven by the checkbox */
+    .sidebar-toggle-input:checked ~ .sidebar {
+        transform: translateX(0);
+        box-shadow: var(--shadow-hover);
+    }
+
+    .sidebar-toggle-input:checked ~ .sidebar-backdrop {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .sidebar ~ .page {
+        margin-left: 0;
+        max-width: 100%;
+        padding: var(--margin-mobile);
+    }
+
+    .sidebar ~ .app-footer {
+        margin-left: 0;
+        width: 100%;
+        padding: 16px var(--margin-mobile);
+    }
+}

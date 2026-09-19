@@ -1,0 +1,173 @@
+@{
+    int currentPage = 1;
+    int totalPages = 1;
+    int totalCount = 0;
+    int pageSize = 10;
+
+    if (Model != null)
+    {
+        var type = Model.GetType();
+        var pageProp = type.GetProperty("Page");
+        var totalPagesProp = type.GetProperty("TotalPages");
+        var totalCountProp = type.GetProperty("TotalCount");
+        var pageSizeProp = type.GetProperty("PageSize");
+
+        if (pageProp != null) currentPage = (int)(pageProp.GetValue(Model) ?? 1);
+        if (totalPagesProp != null) totalPages = (int)(totalPagesProp.GetValue(Model) ?? 1);
+        if (totalCountProp != null) totalCount = (int)(totalCountProp.GetValue(Model) ?? 0);
+        if (pageSizeProp != null) pageSize = (int)(pageSizeProp.GetValue(Model) ?? 10);
+    }
+    else if (ViewBag.Page != null)
+    {
+        currentPage = (int)ViewBag.Page;
+        totalPages = ViewBag.TotalPages != null ? (int)ViewBag.TotalPages : 1;
+        totalCount = ViewBag.TotalCount != null ? (int)ViewBag.TotalCount : 0;
+        pageSize = ViewBag.PageSize != null ? (int)ViewBag.PageSize : 10;
+    }
+
+    if (currentPage < 1) currentPage = 1;
+    if (totalPages < 1) totalPages = 1;
+
+    int fromItem = totalCount == 0 ? 0 : ((currentPage - 1) * pageSize) + 1;
+    int toItem = Math.Min(currentPage * pageSize, totalCount);
+
+    bool hasPrev = currentPage > 1;
+    bool hasNext = currentPage < totalPages;
+
+    string BuildPageUrl(int targetPage, int? targetPageSize = null)
+    {
+        var query = new Dictionary<string, string?>();
+        foreach (var key in Context.Request.Query.Keys)
+        {
+            if (string.Equals(key, "page", StringComparison.OrdinalIgnoreCase)) continue;
+            if (string.Equals(key, "pageSize", StringComparison.OrdinalIgnoreCase) && targetPageSize.HasValue) continue;
+            query[key] = Context.Request.Query[key];
+        }
+        query["page"] = targetPage.ToString();
+        if (targetPageSize.HasValue)
+        {
+            query["pageSize"] = targetPageSize.Value.ToString();
+        }
+        else if (!query.ContainsKey("pageSize") && pageSize != 10)
+        {
+            query["pageSize"] = pageSize.ToString();
+        }
+
+        var queryString = string.Join("&", query
+            .Where(kv => !string.IsNullOrEmpty(kv.Value))
+            .Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value!)}"));
+        return $"{Context.Request.Path}?{queryString}";
+    }
+
+    // Calculate window of page numbers around current page
+    int maxButtons = 5;
+    int startPage = Math.Max(1, currentPage - 2);
+    int endPage = Math.Min(totalPages, startPage + maxButtons - 1);
+    if (endPage - startPage < maxButtons - 1)
+    {
+        startPage = Math.Max(1, endPage - maxButtons + 1);
+    }
+}
+
+@if (totalCount > 0 || totalPages > 1)
+{
+    <div class="pagination-container">
+        <!-- Item count summary -->
+        <div class="pagination-summary">
+            Showing <strong class="mono" style="color:var(--on-surface);">@fromItem&ndash;@toItem</strong> of <strong class="mono" style="color:var(--on-surface);">@totalCount</strong>
+        </div>
+
+        <!-- Page size selector & Page controls -->
+        <div class="pagination-controls">
+            <div class="pagination-pagesize">
+                <span class="pagination-pagesize-label">Rows per page:</span>
+                <select class="pagination-select" onchange="window.location.href = this.value;" aria-label="Select rows per page">
+                    @foreach (var size in new[] { 10, 25, 50, 100 })
+                    {
+                        if (size == pageSize)
+                        {
+                            <option value="@BuildPageUrl(1, size)" selected="selected">@size</option>
+                        }
+                        else
+                        {
+                            <option value="@BuildPageUrl(1, size)">@size</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <nav class="pagination-nav" aria-label="Pagination Navigation">
+                <!-- Previous Button -->
+                @if (hasPrev)
+                {
+                    <a class="pagination-btn pagination-btn--nav" href="@BuildPageUrl(currentPage - 1)" title="Previous page">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                        <span>Previous</span>
+                    </a>
+                }
+                else
+                {
+                    <span class="pagination-btn pagination-btn--nav pagination-btn--disabled">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                        <span>Previous</span>
+                    </span>
+                }
+
+                <!-- Numbered Page Links -->
+                @if (startPage > 1)
+                {
+                    <a class="pagination-btn pagination-btn--num" href="@BuildPageUrl(1)">1</a>
+                    @if (startPage > 2)
+                    {
+                        <span class="pagination-ellipsis">&hellip;</span>
+                    }
+                }
+
+                @for (int p = startPage; p <= endPage; p++)
+                {
+                    if (p == currentPage)
+                    {
+                        <span class="pagination-btn pagination-btn--num pagination-btn--active">@p</span>
+                    }
+                    else
+                    {
+                        <a class="pagination-btn pagination-btn--num" href="@BuildPageUrl(p)">@p</a>
+                    }
+                }
+
+                @if (endPage < totalPages)
+                {
+                    @if (endPage < totalPages - 1)
+                    {
+                        <span class="pagination-ellipsis">&hellip;</span>
+                    }
+                    <a class="pagination-btn pagination-btn--num" href="@BuildPageUrl(totalPages)">@totalPages</a>
+                }
+
+                <!-- Next Button -->
+                @if (hasNext)
+                {
+                    <a class="pagination-btn pagination-btn--nav" href="@BuildPageUrl(currentPage + 1)" title="Next page">
+                        <span>Next</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </a>
+                }
+                else
+                {
+                    <span class="pagination-btn pagination-btn--nav pagination-btn--disabled">
+                        <span>Next</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </span>
+                }
+            </nav>
+        </div>
+    </div>
+}

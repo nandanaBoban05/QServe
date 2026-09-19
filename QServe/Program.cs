@@ -1,7 +1,13 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using QServe.Data;
 using QServe.Hubs;
+using QServe.Models;
+using QServe.Repositories;
+using QServe.Repositories.Interfaces;
 using QServe.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,9 +19,32 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // MVC + Razor Views
 builder.Services.AddControllersWithViews();
 
-// ---- Module 2: Authentication & RBAC ----
-// Custom cookie auth backed directly by the Users table (see Services/AuthService.cs)
-// rather than full ASP.NET Core Identity, since the schema is bespoke to this project.
+// Needed so services (QrCodeService, PasswordResetService, EmailTemplateService) can read
+// the current request's scheme/host to build URLs when App:BaseUrl isn't explicitly set —
+// this is what lets QR/reset/email links automatically match a Dev Tunnel URL.
+builder.Services.AddHttpContextAccessor();
+
+// ---- Module 2: Authentication & RBAC (ASP.NET Core Identity) ----
+builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
+{
+    options.Password.RequiredLength = 8;
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequireUppercase = false;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.User.RequireUniqueEmail = true;
+})
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultTokenProviders();
+
+// Security: Enforce 5-minute lifespan for password reset tokens
+builder.Services.Configure<DataProtectionTokenProviderOptions>(options =>
+{
+    options.TokenLifespan = TimeSpan.FromMinutes(5);
+});
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Forgot Password (self-service). Uses GmailEmailSender when EmailConfig has real credentials;
@@ -33,6 +62,10 @@ builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 builder.Services.AddScoped<IQrCodeService, QrCodeService>();
 
+// ---- Repositories ----
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+
 // ---- Module 5: Payment Processing ----
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
@@ -48,19 +81,33 @@ builder.Services.AddHostedService<RecentOrderedRecalculationService>();
 // ---- Module 10: Reporting & Analytics ----
 builder.Services.AddScoped<IReportingService, ReportingService>();
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/Account/Login";
+    options.AccessDeniedPath = "/Account/AccessDenied";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.SlidingExpiration = true;
+    options.Events = new CookieAuthenticationEvents
     {
-        options.LoginPath = "/Account/Login";
-        options.AccessDeniedPath = "/Account/AccessDenied";
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Strict;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
-        options.SlidingExpiration = true;
-    });
-
-builder.Services.AddAuthorization();
+        OnValidatePrincipal = async context =>
+        {
+            var userIdRaw = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(userIdRaw, out var userId))
+            {
+                var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+                var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+                if (user == null || !user.IsActive)
+                {
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
+                }
+            }
+        }
+    };
+});
 
 // ---- Module 4: Customer Ordering ----
 // Session-based cart storage — there's no persistent customer identity (no login), so the
@@ -81,6 +128,23 @@ builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
+// Must run in Development too — ASP.NET Core Dev Tunnels route traffic through a relay
+// that sets X-Forwarded-Proto/X-Forwarded-Host, and code that reads Request.Scheme/
+// Request.Host (QrCodeService, AdminController.Tables, etc.) depends on this being
+// processed BEFORE those reads happen. XForwardedHost is added (the original block only
+// forwarded For+Proto) because the tunnel's public hostname differs from Kestrel's local
+// binding. KnownNetworks/KnownProxies are cleared because they default to loopback-only,
+// and the Dev Tunnel relay isn't a loopback address.
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+        | ForwardedHeaders.XForwardedHost
+};
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
+
 if (!app.Environment.IsDevelopment())
 {
     // Fail-fast configuration validation
@@ -96,15 +160,10 @@ if (!app.Environment.IsDevelopment())
     if (string.IsNullOrWhiteSpace(dbConn))
         throw new InvalidOperationException("ConnectionStrings:DefaultConnection is missing.");
 
-    if (string.IsNullOrWhiteSpace(app.Configuration["Razorpay:KeyId"]) || 
-        string.IsNullOrWhiteSpace(app.Configuration["Razorpay:KeySecret"]) || 
+    if (string.IsNullOrWhiteSpace(app.Configuration["Razorpay:KeyId"]) ||
+        string.IsNullOrWhiteSpace(app.Configuration["Razorpay:KeySecret"]) ||
         string.IsNullOrWhiteSpace(app.Configuration["Razorpay:WebhookSecret"]))
         throw new InvalidOperationException("Razorpay configuration (KeyId, KeySecret, WebhookSecret) is incomplete.");
-
-    app.UseForwardedHeaders(new ForwardedHeadersOptions
-    {
-        ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
-    });
 
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
@@ -124,5 +183,43 @@ app.MapControllerRoute(
 
 app.MapHub<KitchenHub>("/hubs/kitchen");
 app.MapHealthChecks("/health");
+
+// Automatically ensure RejectionReason column and Payments index are up to date on SQL Server
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    try
+    {
+        if (db.Database.IsSqlServer())
+        {
+            db.Database.ExecuteSqlRaw(@"
+                IF NOT EXISTS (
+                    SELECT 1 FROM sys.columns 
+                    WHERE Name = N'RejectionReason' 
+                    AND Object_ID = Object_ID(N'Payments')
+                )
+                BEGIN
+                    ALTER TABLE Payments ADD RejectionReason NVARCHAR(255) NULL;
+                END;
+
+                IF EXISTS (
+                    SELECT 1 FROM sys.indexes 
+                    WHERE name = N'IX_Payments_OrderID' 
+                    AND object_id = OBJECT_ID(N'Payments') 
+                    AND is_unique = 1
+                )
+                BEGIN
+                    DROP INDEX IX_Payments_OrderID ON Payments;
+                    CREATE INDEX IX_Payments_OrderID ON Payments(OrderID);
+                END;
+            ");
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
+        logger?.LogWarning(ex, "Could not run automated schema update for Payments.RejectionReason.");
+    }
+}
 
 app.Run();

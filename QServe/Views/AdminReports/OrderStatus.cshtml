@@ -6,36 +6,80 @@
 <partial name="_AdminNav" />
 
 <div class="page">
-    <span class="eyebrow">Reports</span>
-    <h1>Order Status Report</h1>
+    <div class="page-head">
+        <div>
+            <span class="eyebrow">Operational Metrics</span>
+            <h1 class="headline-lg">ORDER STATUS REPORT</h1>
+        </div>
+    </div>
+
     <partial name="_ReportsNav" />
     <partial name="_DateRangeFilter" />
 
     <div class="stat-grid">
         <div class="stat-card">
-            <div class="stat-value">@Model.TotalOrders</div>
-            <div class="stat-label">Total Orders</div>
+            <div>
+                <div class="stat-label">Total Orders</div>
+                <div class="stat-value mt-sm">@Model.TotalOrders</div>
+            </div>
+            <div class="text-muted" style="font-size:12px; margin-top:6px;">Processed in date range</div>
         </div>
         <div class="stat-card @(Model.CancellationRatePercent > 10 ? "stat-alert" : "")">
-            <div class="stat-value">@Model.CancellationRatePercent%</div>
-            <div class="stat-label">Cancellation Rate</div>
+            <div>
+                <div class="stat-label">Cancellation Rate</div>
+                <div class="stat-value mt-sm" style="color:@(Model.CancellationRatePercent > 10 ? "var(--error)" : "var(--status-ready-text)");">
+                    @Model.CancellationRatePercent.ToString("0.0")%
+                </div>
+            </div>
+            <div class="text-muted" style="font-size:12px; margin-top:6px;">
+                @(Model.CancellationRatePercent > 10 ? "High cancellation rate" : "Healthy completion rate")
+            </div>
         </div>
     </div>
 
     <div class="card mt-lg">
-        <h3 style="margin-bottom:12px;">Orders by status</h3>
+        <h3 style="margin-bottom:16px;">ORDERS BY CURRENT / FINAL STATUS</h3>
         @if (!Model.CountsByStatus.Any())
         {
-            <p class="kds-empty">No orders in this range.</p>
+            <div class="empty-state" style="padding:24px 0;">
+                <p class="empty-state-text">No orders found in this date range.</p>
+            </div>
         }
         else
         {
-            <table class="data-table" style="max-width:360px;">
-                @foreach (var (status, count) in Model.CountsByStatus.OrderByDescending(kv => kv.Value))
-                {
-                    <tr><td>@status</td><td class="num">@count</td></tr>
-                }
-            </table>
+            <div class="data-table-container" style="max-width:480px;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Status State</th>
+                            <th style="text-align:right;">Order Count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var (status, count) in Model.CountsByStatus.OrderByDescending(kv => kv.Value))
+                    {
+                        <tr>
+                            <td>
+                                @{
+                                    string badgeClass = status switch {
+                                        "Approved" => "badge-approved",
+                                        "Preparing" => "badge-preparing",
+                                        "Ready" => "badge-ready",
+                                        "Served" => "badge-served",
+                                        "Cancelled" => "badge-cancelled",
+                                        "PendingPayment" => "badge-pending",
+                                        "AwaitingVerification" => "badge-awaiting",
+                                        _ => "badge-neutral"
+                                    };
+                                }
+                                <span class="badge @badgeClass">@status</span>
+                            </td>
+                            <td class="num" style="text-align:right; font-weight:700; font-size:15px; color:var(--on-surface);">@count</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
         }
     </div>
 </div>

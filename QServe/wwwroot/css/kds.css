@@ -1,0 +1,476 @@
+/* =========================================================================
+   QSERVE DESIGN SYSTEM — KITCHEN DISPLAY SYSTEM (KDS)
+   Warm, light, high-legibility kitchen interface.
+   All selectors below are scoped to KDS-only classes (.topbar, .topbar__*,
+   .kds-*) so nothing here affects any other page in the app.
+   ========================================================================= */
+
+:root {
+    --kds-header-height: 78px; /* fallback before JS measures the real height */
+}
+
+/* ---------------------------------------------------------------------
+   KDS HEADER (formerly the dark staff topbar)
+   --------------------------------------------------------------------- */
+.topbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 12px 24px;
+    background-color: var(--surface-container-lowest); /* #ffffff */
+    color: var(--on-surface);
+    border-bottom: none;
+    box-shadow: var(--shadow-sm);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+.topbar__brand {
+    display: flex;
+    align-items: center;
+    padding-right: 16px;
+    margin-right: 4px;
+    border-right: 1px solid var(--outline-subtle);
+}
+
+    .topbar__brand .brand-logo {
+        display: block;
+    }
+
+.topbar__live {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background-color: var(--status-ready-bg);
+    color: var(--status-ready-text);
+    border: 1px solid var(--status-ready-border);
+    padding: 6px 12px;
+    border-radius: var(--radius-pill);
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.topbar__live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--status-ready-text);
+    animation: kds-pulse 1.6s ease-in-out infinite;
+}
+
+.topbar__clock {
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+
+@keyframes kds-pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.45;
+        transform: scale(0.85);
+    }
+}
+
+.topbar__summary {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 0 auto;
+}
+
+.topbar__active-count {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--on-surface);
+    white-space: nowrap;
+}
+
+.topbar__type-counts {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.kds-count-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: var(--radius-pill);
+    font-size: 12.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+
+.topbar__icons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.topbar__icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--outline-subtle);
+    background-color: var(--surface-container-lowest);
+    color: var(--on-surface-variant);
+    cursor: pointer;
+    transition: background-color var(--transition-normal), color var(--transition-normal);
+    position: relative;
+}
+
+    .topbar__icon-btn:hover {
+        background-color: var(--surface-container-low);
+        color: var(--primary);
+    }
+
+    .topbar__icon-btn svg {
+        width: 19px;
+        height: 19px;
+    }
+
+.topbar__user-menu {
+    position: relative;
+}
+
+/* Notification bell badge — small dot indicating an unseen PaymentPendingVerification event */
+.topbar__icon-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background-color: var(--error);
+    border: 2px solid var(--surface-container-lowest);
+}
+
+    .topbar__icon-badge[hidden] {
+        display: none;
+    }
+
+.topbar__user-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background-color: var(--surface-container-lowest);
+    border: 1px solid var(--outline-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-hover);
+    min-width: 190px;
+    padding: 6px;
+    z-index: 30;
+}
+
+    .topbar__user-dropdown.is-open {
+        display: block;
+    }
+
+    .topbar__user-dropdown a,
+    .topbar__user-dropdown button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        padding: 9px 12px;
+        border-radius: var(--radius-default);
+        font-family: var(--font-family);
+        font-size: 13.5px;
+        font-weight: 500;
+        color: var(--on-surface);
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+        .topbar__user-dropdown a:hover,
+        .topbar__user-dropdown button:hover {
+            background-color: var(--surface-container-low);
+        }
+
+/* ---------------------------------------------------------------------
+   STATUS FILTER TABS (All Active / New / Preparing / Ready / Served Today)
+   Sticky offset uses --kds-header-height, which JS keeps in sync with the
+   header's real rendered height (see script block in Index.cshtml) — this
+   stays correct even if the header wraps onto 2–3 lines on a narrow screen.
+   --------------------------------------------------------------------- */
+.kds-filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 12px 24px 16px;
+    background-color: var(--surface-container-lowest);
+    border-bottom: 1px solid var(--outline-subtle);
+    box-shadow: var(--shadow-sm);
+    position: sticky;
+    top: var(--kds-header-height);
+    z-index: 19;
+}
+
+    .kds-filter-bar a.topbar__link {
+        color: var(--on-surface-variant);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 8px 14px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--outline-subtle);
+        background-color: var(--surface-container-lowest);
+        transition: all var(--transition-fast);
+        white-space: nowrap;
+        display: inline-block;
+    }
+
+        .kds-filter-bar a.topbar__link:hover {
+            border-color: var(--primary-container);
+            color: var(--primary);
+            background-color: var(--surface-container-low);
+        }
+
+        .kds-filter-bar a.topbar__link.active {
+            color: var(--on-primary);
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+
+/* =========================================================================
+   KDS ORDER GRID & CARDS
+   ========================================================================= */
+.kds-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-lg);
+    margin-top: var(--space-lg);
+}
+
+@media (max-width: 1200px) {
+    .kds-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .kds-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.kds-card {
+    background-color: var(--surface-container-lowest);
+    border-radius: var(--radius-xl);
+    padding: 20px 22px 22px;
+    color: var(--on-surface);
+    border: 1px solid var(--outline-subtle);
+    border-top-width: 6px;
+    box-shadow: var(--shadow-card);
+    display: flex;
+    flex-direction: column;
+    min-height: 260px;
+    position: relative;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+    .kds-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-hover);
+    }
+
+    /* Priority accents on card top border — matches the standardized --tier-* scale */
+    .kds-card.tier-quick {
+        border-top-color: var(--tier-quick-text);
+    }
+
+    .kds-card.tier-regular {
+        border-top-color: var(--tier-regular-text);
+    }
+
+    .kds-card.tier-heavy {
+        border-top-color: var(--tier-heavy-text);
+        background-color: var(--tier-heavy-bg);
+    }
+
+.kds-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--surface-container);
+}
+
+.kds-table-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--on-surface);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+}
+
+
+
+.kds-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-top: 8px;
+}
+
+.kds-order-id {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--on-surface-variant);
+    font-weight: 500;
+}
+
+.kds-timer {
+    font-family: var(--font-mono);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--on-surface);
+    letter-spacing: -0.02em;
+}
+
+.kds-card.tier-heavy .kds-timer {
+    color: var(--tier-heavy-text);
+}
+
+.kds-note-banner {
+    background-color: var(--status-preparing-bg);
+    border: 1px solid var(--status-preparing-border);
+    border-radius: var(--radius-default);
+    padding: 8px 12px;
+    font-size: 12.5px;
+    margin-bottom: 12px;
+    color: var(--status-preparing-text);
+}
+
+.kds-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px;
+    font-size: 15.5px;
+    flex: 1;
+}
+
+.kds-card li {
+    padding: 9px 0;
+    border-bottom: 1px dashed var(--surface-container-high);
+    line-height: 1.4;
+}
+
+    .kds-card li:last-child {
+        border-bottom: none;
+    }
+
+.kds-qty {
+    display: inline-block;
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--primary);
+    margin-right: 6px;
+}
+
+.kds-item-name {
+    font-weight: 700;
+    color: var(--on-surface);
+}
+
+.custom-note {
+    font-size: 12.5px;
+    color: var(--on-primary-container);
+    background-color: var(--primary-fixed);
+    border-radius: var(--radius-sm);
+    padding: 3px 9px;
+    margin-top: 5px;
+    display: inline-block;
+    font-weight: 600;
+}
+
+.kds-card__foot {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--surface-container);
+}
+
+.kds-card__status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.kds-card__actions {
+    display: flex;
+    gap: 10px;
+}
+
+.kds-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--radius-lg);
+    padding: 15px 18px;
+    font-family: var(--font-family);
+    font-size: 15.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color var(--transition-normal), transform var(--transition-fast);
+    min-height: 52px;
+}
+
+    .kds-btn:active {
+        transform: scale(0.98);
+    }
+
+.kds-btn-primary {
+    background-color: var(--primary-container);
+    color: var(--on-primary-container);
+}
+
+    .kds-btn-primary:hover {
+        background-color: var(--primary-hover);
+        color: #ffffff;
+    }
+
+.kds-btn-secondary {
+    flex: 0 0 auto;
+    min-width: 110px;
+    background-color: var(--surface-container-lowest);
+    color: var(--on-surface);
+    border: 1px solid var(--outline-subtle);
+}
+
+    .kds-btn-secondary:hover {
+        background-color: var(--surface-container-low);
+    }
+
+.kds-timer-pill {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--on-surface-variant);
+    background-color: var(--surface-container-low);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--outline-subtle);
+}

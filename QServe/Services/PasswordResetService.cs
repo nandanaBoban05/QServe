@@ -1,6 +1,9 @@
-using System.Security.Cryptography;
-using System.Text;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using QServe.Data;
 using QServe.Models;
 
@@ -8,106 +11,123 @@ namespace QServe.Services;
 
 public class PasswordResetService : IPasswordResetService
 {
-    private static readonly TimeSpan TokenLifetime = TimeSpan.FromHours(1);
-
+    private readonly UserManager<User> _userManager;
     private readonly ApplicationDbContext _db;
     private readonly IEmailSender _emailSender;
     private readonly IEmailTemplateService _templateService;
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
+    private readonly ILogger<PasswordResetService> _logger;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public PasswordResetService(
-        ApplicationDbContext db, 
-        IEmailSender emailSender, 
+        UserManager<User> userManager,
+        ApplicationDbContext db,
+        IEmailSender emailSender,
         IEmailTemplateService templateService,
-        IConfiguration config, 
-        IWebHostEnvironment env)
+        IConfiguration config,
+        IWebHostEnvironment env,
+        ILogger<PasswordResetService> logger,
+        IHttpContextAccessor httpContextAccessor)
     {
+        _userManager = userManager;
         _db = db;
         _emailSender = emailSender;
         _templateService = templateService;
         _config = config;
         _env = env;
+        _logger = logger;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<string?> RequestResetAsync(string email)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email && u.IsActive);
-
-        // Enumeration safety: the RETURN VALUE never differs based on whether the account
-        // exists in Production (always null there), and the caller shows one generic message
-        // regardless. We do skip the token/email work entirely for a non-match, which is a
-        // minor timing signal — accepted trade-off for a staff-only internal tool, not a
-        // public consumer product where that timing difference would matter more.
-        if (user is null)
+        if (string.IsNullOrWhiteSpace(email))
             return null;
 
-        var tokenBytes = RandomNumberGenerator.GetBytes(32);
-        var rawToken = Convert.ToBase64String(tokenBytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
-        var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken))).ToLowerInvariant();
+        var user = await _userManager.FindByEmailAsync(email);
 
-        user.PasswordResetTokenHash = tokenHash;
-        user.PasswordResetTokenExpiry = DateTime.UtcNow.Add(TokenLifetime);
+        // Enumeration safety: the RETURN VALUE never differs based on whether the account exists
+        if (user is null || !user.IsActive)
+            return null;
+
+        // Invalidate all previous reset tokens immediately so only the latest link works
+        await _userManager.UpdateSecurityStampAsync(user);
+
+        var rawToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            EntityType = "Users",
+            EntityID = user.Id,
+            Action = "PasswordResetRequested",
+            PerformedBy = null,
+            Timestamp = DateTime.UtcNow
+        });
+
         await _db.SaveChangesAsync();
 
-        var baseUrl = _config["App:BaseUrl"]?.TrimEnd('/')
-            ?? throw new InvalidOperationException("App:BaseUrl is not configured.");
+        var baseUrl = ResolveBaseUrl();
         var resetLink = $"{baseUrl}/Account/ResetPassword?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(rawToken)}";
 
-        // Render HTML template
-        var htmlBody = await _templateService.RenderPasswordResetTemplateAsync(
-            user.FullName ?? "User",
-            resetLink);
+        try
+        {
+            var htmlBody = await _templateService.RenderPasswordResetTemplateAsync(
+                user.FullName ?? "Staff Member",
+                resetLink);
 
-        await _emailSender.SendAsync(new EmailMessage(
-            ToEmail: email,
-            Subject: "Reset your QServe password",
-            Body: htmlBody));
+            await _emailSender.SendAsync(new EmailMessage(
+                ToEmail: email,
+                Subject: "Reset your QServe password",
+                Body: htmlBody));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send password reset email to {Email}", email);
+        }
 
         return _env.IsDevelopment() ? resetLink : null;
     }
 
     public async Task<bool> ResetPasswordAsync(string email, string token, string newPassword)
     {
-        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 8)
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 8)
             return false;
 
-        if (string.IsNullOrWhiteSpace(token))
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user is null || !user.IsActive)
             return false;
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email && u.IsActive);
-        if (user?.PasswordResetTokenHash is null || user.PasswordResetTokenExpiry is null)
+        var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
+        if (!result.Succeeded)
             return false;
 
-        if (user.PasswordResetTokenExpiry.Value < DateTime.UtcNow)
-            return false; // expired — caller should prompt for a fresh request, not retry this token
-
-        var suppliedHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
-        var tokenValid = CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(suppliedHash),
-            Encoding.UTF8.GetBytes(user.PasswordResetTokenHash));
-
-        if (!tokenValid)
-            return false;
-
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
-        // Single-use: clear the token immediately so this same link can't be replayed.
-        user.PasswordResetTokenHash = null;
-        user.PasswordResetTokenExpiry = null;
-        // A fresh password shouldn't stay locked out behind old failed login attempts.
-        user.AccessFailedCount = 0;
-        user.LockoutEnd = null;
+        await _userManager.ResetAccessFailedCountAsync(user);
+        await _userManager.SetLockoutEndDateAsync(user, null);
 
         _db.AuditLogs.Add(new AuditLog
         {
             EntityType = "Users",
-            EntityID = user.UserID,
+            EntityID = user.Id,
             Action = "PasswordResetSelfService",
-            PerformedBy = null, // no admin involved — the user reset their own password
+            PerformedBy = null,
             Timestamp = DateTime.UtcNow
         });
 
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    private string ResolveBaseUrl()
+    {
+        var configured = _config["App:BaseUrl"];
+        if (!string.IsNullOrWhiteSpace(configured) && !configured.Contains("localhost", StringComparison.OrdinalIgnoreCase))
+            return configured.TrimEnd('/');
+
+        var request = _httpContextAccessor.HttpContext?.Request;
+        if (request is not null)
+            return $"{request.Scheme}://{request.Host}";
+
+        throw new InvalidOperationException("App:BaseUrl is not configured and no active HTTP request is available to derive it from.");
     }
 }

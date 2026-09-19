@@ -3,15 +3,32 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] — QServe</title>
+    <title>@(ViewData["Title"] != null ? $"{ViewData["Title"]} — QServe" : "QServe — Smart Restaurant Management")</title>
+    <meta name="description" content="QServe — Smart Restaurant Management" />
     <link rel="icon" type="image/png" href="~/images/logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="~/css/theme.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/qserve-design-system.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/qserve-components.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/customer.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/kds.css" asp-append-version="true" />
 </head>
 <body>
     @RenderBody()
+    @{
+        string currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+        string currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+        bool isLoginPage = string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase);
+        bool hideFooter = isLoginPage || (ViewData["HideFooter"] as bool? == true);
+    }
+    @if (!hideFooter)
+    {
+        <partial name="_Footer" />
+    }
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

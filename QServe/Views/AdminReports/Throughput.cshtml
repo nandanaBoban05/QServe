@@ -7,50 +7,73 @@
 <partial name="_AdminNav" />
 
 <div class="page">
-    <span class="eyebrow">Reports</span>
-    <h1>Kitchen Throughput</h1>
+    <div class="page-head">
+        <div>
+            <span class="eyebrow">Kitchen Operations</span>
+            <h1 class="headline-lg">KITCHEN THROUGHPUT</h1>
+        </div>
+    </div>
+
     <partial name="_ReportsNav" />
     <partial name="_DateRangeFilter" />
 
     <div class="card">
-        <h3 style="margin-bottom:6px;">Average prep time by item type</h3>
-        <p class="text-muted" style="font-size:12.5px; margin-top:0; margin-bottom:14px;">
-            Prep time = ServedAt − ApprovedAt at the order level. An order spanning multiple
-            item types credits its full duration to each type present.
+        <h3 style="margin-bottom:6px;">AVERAGE PREPARATION TIME BY ITEM TYPE</h3>
+        <p class="text-muted" style="font-size:13px; margin-top:0; margin-bottom:16px;">
+            Prep time = ServedAt &minus; ApprovedAt at order level.
         </p>
+
         @if (!Model.Any())
         {
-            <p class="kds-empty">No completed orders in this range.</p>
+            <div class="empty-state" style="padding:24px 0;">
+                <p class="empty-state-text">No completed orders recorded in this date range.</p>
+            </div>
         }
         else
         {
-            <table class="data-table" style="max-width:480px;">
-                <thead><tr><th>Item Type</th><th>Avg Prep (min)</th><th>Orders</th></tr></thead>
-                <tbody>
-                @foreach (var row in Model)
-                {
-                    <tr><td>@row.ItemType</td><td class="num">@row.AvgPrepMinutes</td><td class="num">@row.OrdersCompleted</td></tr>
-                }
-                </tbody>
-            </table>
+            <div class="data-table-container" style="max-width:540px;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Item Type</th>
+                            <th style="text-align:right;">Avg Prep (minutes)</th>
+                            <th style="text-align:right;">Completed Orders</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model)
+                    {
+                        <tr>
+                            <td><strong style="color:var(--on-surface);">@row.ItemType</strong></td>
+                            <td class="num" style="text-align:right; font-weight:700; color:var(--primary); font-size:14.5px;">@row.AvgPrepMinutes min</td>
+                            <td class="num text-muted" style="text-align:right;">@row.OrdersCompleted</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
         }
     </div>
 
     <div class="card mt-lg">
-        <h3 style="margin-bottom:14px;">Orders by hour of day</h3>
+        <h3 style="margin-bottom:16px;">ORDERS BY HOUR OF DAY</h3>
         @if (!peakHours.Any())
         {
-            <p class="kds-empty">No orders in this range.</p>
+            <div class="empty-state" style="padding:24px 0;">
+                <p class="empty-state-text">No orders in this range.</p>
+            </div>
         }
         else
         {
-            <div style="display:flex; align-items:flex-end; gap:6px; height:120px;">
+            <div style="display:flex; align-items:flex-end; gap:8px; height:140px; padding-top:20px; overflow-x:auto;">
                 @{ var maxCount = peakHours.Max(h => h.OrderCount); }
                 @foreach (var hour in peakHours)
                 {
-                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:flex-end; font-family:var(--font-mono); font-size:10px; color:var(--ink-faint);">
-                        <div style="width:14px; background:var(--turmeric-deep); border-radius:2px 2px 0 0; min-height:2px; height:@((maxCount > 0 ? hour.OrderCount * 100 / maxCount : 0))px;"></div>
-                        <span>@hour.Hour:00</span>
+                    var heightPx = maxCount > 0 ? Math.Max(4, hour.OrderCount * 100 / maxCount) : 4;
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:flex-end; font-family:var(--font-mono); font-size:11px; color:var(--on-surface-muted); min-width:24px;">
+                        <span style="font-size:10px; margin-bottom:4px; font-weight:600; color:var(--on-surface);">@hour.OrderCount</span>
+                        <div style="width:16px; background:var(--primary-container); border-radius:4px 4px 0 0; height:@(heightPx)px;"></div>
+                        <span style="margin-top:6px;">@hour.Hour:00</span>
                     </div>
                 }
             </div>

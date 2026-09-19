@@ -2,17 +2,59 @@
     ViewData["Title"] = "Staff Login";
 }
 
+<style>
+    .password-field {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+        .password-field input {
+            flex: 1;
+            padding-right: 42px;
+        }
+
+    .password-toggle {
+        position: absolute;
+        right: 10px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--on-surface-muted);
+        padding: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+    }
+
+        .password-toggle:hover {
+            color: var(--on-surface);
+        }
+
+    .eye-icon {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+</style>
+
 <div class="page page--auth">
     <div class="auth-card" style="text-align:center;">
-        <img src="~/images/logo.png" alt="QServe" class="brand-logo brand-logo--plain" width="64" height="64" style="margin:0 auto 12px;" />
-        <h1 style="font-size:22px; margin-bottom:2px;">QServe</h1>
-        <p class="eyebrow" style="margin-bottom:22px;">Smart Restaurant Management</p>
+        <div style="margin:0 auto 5px; display:inline-block;">
+            <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "180" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
+        </div>
+        <span class="eyebrow" style="margin-bottom:24px;">Smart Restaurant Management</span>
 
         <div style="text-align:left;">
             @if (TempData["LoginMessage"] is string loginMessage)
             {
-                <div class="card" style="background:var(--curry-tint); border-color:#b9caae; padding:10px 14px; margin-bottom:14px;">
-                    <span style="font-size:13px;">@loginMessage</span>
+                <div class="card" style="background:var(--status-ready-bg); border-color:var(--status-ready-border); padding:12px 16px; margin-bottom:16px;">
+                    <span style="font-size:13.5px; color:var(--status-ready-text); font-weight:500;">@loginMessage</span>
                 </div>
             }
 
@@ -30,21 +72,43 @@
                 @Html.AntiForgeryToken()
 
                 <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" required autofocus />
+                    <label for="email">Staff Email</label>
+                    <input type="email" id="email" name="email" placeholder="••••••••" required autofocus />
                 </div>
 
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required />
+                    <div class="password-field">
+                        <input type="password" id="password" name="password" placeholder="••••••••" required />
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password', this)" aria-label="Show password">
+                            <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                            <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                        </button>
+                    </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-block">Log In</button>
+                <button type="submit" class="btn btn-primary btn-block" style="padding:12px; margin-top:8px; font-size:15px; font-weight:600;">
+                    Log In
+                </button>
             </form>
 
-            <p style="text-align:center; margin-top:14px;">
-                <a asp-controller="Account" asp-action="ForgotPassword" style="font-size:13px; color:var(--ink-soft);">Forgot password?</a>
+            <p style="text-align:center; margin-top:16px;">
+                <a asp-controller="Account" asp-action="ForgotPassword" style="font-size:13px; color:var(--on-surface-variant); text-decoration:underline;">
+                    Forgot your password?
+                </a>
             </p>
         </div>
     </div>
 </div>
+
+<script>
+    function togglePasswordVisibility(fieldId, button) {
+        event.preventDefault();
+        const field = document.getElementById(fieldId);
+        const isPassword = field.type === 'password';
+        field.type = isPassword ? 'text' : 'password';
+        button.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+        button.querySelector('.eye-icon--open').style.display = isPassword ? 'none' : 'block';
+        button.querySelector('.eye-icon--closed').style.display = isPassword ? 'block' : 'none';
+    }
+</script>
