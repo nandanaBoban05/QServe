@@ -42,7 +42,7 @@ public class AdminTests
         };
         _config = new ConfigurationBuilder().AddInMemoryCollection(inMemorySettings).Build();
 
-        _qrCodeServiceMock.Setup(q => q.BuildToken(It.IsAny<int>())).Returns("mock_token_abc");
+        _qrCodeServiceMock.Setup(q => q.BuildToken(It.IsAny<int>(), It.IsAny<string?>())).Returns("mock_token_abc");
         _qrCodeServiceMock.Setup(q => q.GenerateForTableAsync(It.IsAny<int>())).ReturnsAsync(new byte[] { 1, 2, 3 });
 
         var userManager = CreateUserManager(_db);
