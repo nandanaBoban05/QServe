@@ -2,11 +2,13 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using QServe.Models;
 using QServe.Services;
 
 namespace QServe.Controllers;
 
+[EnableRateLimiting("AuthRateLimit")]
 public class AccountController : Controller
 {
     private readonly IAuthService _authService;

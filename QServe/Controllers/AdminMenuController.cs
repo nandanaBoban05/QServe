@@ -100,8 +100,8 @@ public class AdminMenuController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
-        var page = filter.Page > 0 ? filter.Page : 1;
+        var pageSize = Math.Clamp(filter.PageSize > 0 ? filter.PageSize : 10, 1, 100);
+        var page = Math.Max(1, filter.Page > 0 ? filter.Page : 1);
 
         var items = await query
             .OrderBy(i => i.Category != null ? i.Category.DisplayOrder : 0)
@@ -335,8 +335,8 @@ public class AdminMenuController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
-        var page = filter.Page > 0 ? filter.Page : 1;
+        var pageSize = Math.Clamp(filter.PageSize > 0 ? filter.PageSize : 10, 1, 100);
+        var page = Math.Max(1, filter.Page > 0 ? filter.Page : 1);
 
         var categories = await query
             .Include(c => c.Items)

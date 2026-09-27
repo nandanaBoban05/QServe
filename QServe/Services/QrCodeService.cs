@@ -25,17 +25,30 @@ public class QrCodeService : IQrCodeService
         var table = await _db.RestaurantTables.FindAsync(tableId)
             ?? throw new InvalidOperationException($"Table {tableId} not found.");
 
-        var token = BuildToken(tableId);
+        var token = BuildToken(tableId, table.QrTokenSalt);
         var baseUrl = ResolveBaseUrl();
         var url = $"{baseUrl}/order/table/{tableId}?token={Uri.EscapeDataString(token)}";
 
         table.QRCodeData = url;
         await _db.SaveChangesAsync();
 
-        using var qrGenerator = new QRCodeGenerator();
-        using var qrData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
-        var pngQr = new PngByteQRCode(qrData);
-        return pngQr.GetGraphic(20); // 20px per module -> roughly 500x500px, print-friendly
+        return RenderQrPng(url);
+    }
+
+    public async Task<byte[]> RegenerateForTableAsync(int tableId)
+    {
+        var table = await _db.RestaurantTables.FindAsync(tableId)
+            ?? throw new InvalidOperationException($"Table {tableId} not found.");
+
+        table.QrTokenSalt = Guid.NewGuid().ToString("N");
+        var token = BuildToken(tableId, table.QrTokenSalt);
+        var baseUrl = ResolveBaseUrl();
+        var url = $"{baseUrl}/order/table/{tableId}?token={Uri.EscapeDataString(token)}";
+
+        table.QRCodeData = url;
+        await _db.SaveChangesAsync();
+
+        return RenderQrPng(url);
     }
 
     public bool ValidateToken(int tableId, string token)
@@ -46,7 +59,7 @@ public class QrCodeService : IQrCodeService
         if (table is null || !table.IsActive)
             return false;
 
-        var expectedToken = BuildToken(tableId);
+        var expectedToken = BuildToken(tableId, table.QrTokenSalt);
 
         // Constant-time comparison to avoid timing side-channels on token guessing.
         return CryptographicOperations.FixedTimeEquals(
@@ -54,14 +67,38 @@ public class QrCodeService : IQrCodeService
             Encoding.UTF8.GetBytes(expectedToken));
     }
 
-    public string BuildToken(int tableId)
+    public async Task<bool> ValidateTokenAsync(int tableId, string token)
+    {
+        var table = await _db.RestaurantTables.FindAsync(tableId);
+
+        if (table is null || !table.IsActive)
+            return false;
+
+        var expectedToken = BuildToken(tableId, table.QrTokenSalt);
+
+        return CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(token),
+            Encoding.UTF8.GetBytes(expectedToken));
+    }
+
+    public string BuildToken(int tableId, string? salt = null)
     {
         var secret = _config["QrCode:SigningSecret"]
             ?? throw new InvalidOperationException("QrCode:SigningSecret is not configured.");
 
+        var payload = string.IsNullOrWhiteSpace(salt) ? tableId.ToString() : $"{tableId}:{salt}";
+
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(tableId.ToString()));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
         return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static byte[] RenderQrPng(string url)
+    {
+        using var qrGenerator = new QRCodeGenerator();
+        using var qrData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
+        var pngQr = new PngByteQRCode(qrData);
+        return pngQr.GetGraphic(20); // 20px per module -> roughly 500x500px, print-friendly
     }
 
     // Prefers an explicit, non-localhost App:BaseUrl (real production override). Otherwise

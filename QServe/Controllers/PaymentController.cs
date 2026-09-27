@@ -62,12 +62,8 @@ public class PaymentController : Controller
     }
 
     // Called by the browser JS after Razorpay's checkout widget reports success.
-    //
-    // Not anti-forgery-token-protected: this endpoint's real defense is the HMAC signature
-    // check inside ConfirmOnlinePaymentAsync — a forged call without a valid Razorpay
-    // signature is rejected regardless. Wiring a proper anti-forgery token through a fetch()
-    // call is straightforward if you'd rather have both layers; flagged here as a known
-    // simplification rather than left silently.
+    // Protected by both [ValidateAntiForgeryToken] and HMAC signature verification inside
+    // ConfirmOnlinePaymentAsync for defense-in-depth against CSRF and payload tampering.
     [HttpPost("confirm")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Confirm(int orderId, string razorpayOrderId, string razorpayPaymentId, string razorpaySignature)

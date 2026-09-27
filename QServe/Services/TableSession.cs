@@ -13,9 +13,27 @@ public static class TableSession
         return storedToken is not null && qr.ValidateToken(tableId, storedToken);
     }
 
+    public static async Task<bool> IsTableSessionValidAsync(ISession session, IQrCodeService qr, int tableId)
+    {
+        var storedToken = session.GetString(TokenKey(tableId));
+        return storedToken is not null && await qr.ValidateTokenAsync(tableId, storedToken);
+    }
+
     public static bool CanAccessOrder(ISession session, IQrCodeService qr, int tableId, int orderId)
     {
         if (!IsTableSessionValid(session, qr, tableId))
+            return false;
+
+        var json = session.GetString(OrdersKey(tableId));
+        if (json is null) return false;
+
+        var orderIds = System.Text.Json.JsonSerializer.Deserialize<List<int>>(json) ?? new();
+        return orderIds.Contains(orderId);
+    }
+
+    public static async Task<bool> CanAccessOrderAsync(ISession session, IQrCodeService qr, int tableId, int orderId)
+    {
+        if (!await IsTableSessionValidAsync(session, qr, tableId))
             return false;
 
         var json = session.GetString(OrdersKey(tableId));

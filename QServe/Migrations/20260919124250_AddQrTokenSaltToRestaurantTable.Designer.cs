@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QServe.Data;
 
@@ -11,9 +12,11 @@ using QServe.Data;
 namespace QServe.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260919124250_AddQrTokenSaltToRestaurantTable")]
+    partial class AddQrTokenSaltToRestaurantTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -937,7 +940,7 @@ namespace QServe.Migrations
                             LockoutEnabled = false,
                             NormalizedEmail = "ADMIN@RESTAURANT.LOCAL",
                             NormalizedUserName = "ADMIN@RESTAURANT.LOCAL",
-                            PasswordHash = "AQAAAAIAAYagAAAAEI7deRVroGLHy6YQT4vo7Fq46Jw3nN9Io2hRZwkfeeyeYaoCd7AtK+yUvlmeP7GeCw==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEJoyIDmPexCGsaYWWSMI+ziUYXM7Z8JX/s3xAteNzcf/oICIDFOzD6xfkaxc9cIWYw==",
                             PhoneNumberConfirmed = false,
                             Role = "Admin",
                             SecurityStamp = "8D42A1E3-8E5A-40D9-97C5-3C72A99E9801",
@@ -957,7 +960,7 @@ namespace QServe.Migrations
                             LockoutEnabled = false,
                             NormalizedEmail = "KITCHEN@RESTAURANT.LOCAL",
                             NormalizedUserName = "KITCHEN@RESTAURANT.LOCAL",
-                            PasswordHash = "AQAAAAIAAYagAAAAEGTBhh8DZonzMpfqI+ncGtB/nvv78R4+VwoHT11l64g1AWeG4dncRMVfseIl8DaJTA==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEKARyV97cSRfLNZSuIH9C/c/vvwdOEuc7EU84LbHXHRqZgTN5Y2+BOqla2kaKGSveg==",
                             PhoneNumberConfirmed = false,
                             Role = "Kitchen",
                             SecurityStamp = "9E53B2F4-9F6B-51EA-08D6-4D83B00F0902",
@@ -977,7 +980,7 @@ namespace QServe.Migrations
                             LockoutEnabled = false,
                             NormalizedEmail = "MANAGER@RESTAURANT.LOCAL",
                             NormalizedUserName = "MANAGER@RESTAURANT.LOCAL",
-                            PasswordHash = "AQAAAAIAAYagAAAAEA5AG/idzRdJkML0p4Owk9HFDQLE3SXF1vO1DvtfTHWd14X5B0/1/M0y0mc9B5WKkw==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEMikNOfy6DZpIb3ehMRffG+ZhAADJ6NAfCheEC+3baHKfz9ggEFGb8BiPUUeuOvv6Q==",
                             PhoneNumberConfirmed = false,
                             Role = "Manager",
                             SecurityStamp = "0F64C3A5-0A7C-62FB-19E7-5E94C11A1003",

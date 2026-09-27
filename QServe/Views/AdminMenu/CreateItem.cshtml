@@ -92,12 +92,24 @@
 
             <div class="form-group">
                 <label>Item Image (optional)</label>
-                <input type="file" name="imageFile" accept="image/png, image/jpeg, image/webp, image/gif" />
+                <input type="file" id="itemImageInput" name="imageFile" accept="image/png, image/jpeg, image/webp, image/gif" onchange="handleImagePreview(this)" />
                 <span class="text-muted" style="font-size:12px; display:block; margin-top:4px;">JPG, PNG, WEBP or GIF — up to 5 MB.</span>
                 @if (ViewData.ModelState["ImageUrl"]?.Errors.Any() == true)
                 {
                     <span class="text-danger" style="font-size:12.5px; margin-top:4px; display:block;">@ViewData.ModelState["ImageUrl"]!.Errors.First().ErrorMessage</span>
                 }
+
+                <!-- Live Instant Preview Container -->
+                <div id="imagePreviewWrapper" style="display:none; margin-top:14px; padding:12px 14px; border:1px dashed var(--outline-variant); border-radius:var(--radius-md); background:var(--surface-container-lowest); width:fit-content;">
+                    <span class="label-md" style="display:block; margin-bottom:8px; font-size:12px; color:var(--on-surface-variant); font-weight:600;">Selected Image Preview:</span>
+                    <div style="display:flex; align-items:center; gap:14px;">
+                        <img id="imagePreview" src="#" alt="Selected Preview" style="width:96px; height:96px; border-radius:8px; object-fit:cover; border:1px solid var(--outline-subtle); display:block;" />
+                        <div>
+                            <span id="imageFileName" style="font-size:13px; font-weight:600; display:block; color:var(--on-surface);"></span>
+                            <span id="imageFileSize" class="text-muted" style="font-size:12px; display:block; margin-top:2px;"></span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--surface-container-high); display:flex; gap:12px; justify-content:flex-end;">
@@ -107,3 +119,34 @@
         </form>
     </div>
 </div>
+
+<script>
+    function handleImagePreview(input) {
+        const wrapper = document.getElementById('imagePreviewWrapper');
+        const img = document.getElementById('imagePreview');
+        const nameEl = document.getElementById('imageFileName');
+        const sizeEl = document.getElementById('imageFileSize');
+
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            
+            if (file.size > 5 * 1024 * 1024) {
+                alert("File size exceeds 5MB. Please choose a smaller image.");
+                input.value = "";
+                wrapper.style.display = 'none';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                img.src = e.target.result;
+                nameEl.textContent = file.name;
+                sizeEl.textContent = (file.size / 1024).toFixed(1) + " KB";
+                wrapper.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            wrapper.style.display = 'none';
+        }
+    }
+</script>

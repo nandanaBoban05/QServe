@@ -107,13 +107,14 @@
 
         <form id="checkout-form" asp-action="Checkout" asp-route-tableId="@tableId" method="post" class="mt-lg">
             @Html.AntiForgeryToken()
+            <input type="hidden" name="idempotencyKey" value="@Guid.NewGuid().ToString("N")" />
             <h3 style="margin-bottom:14px; font-size:16px;">CHOOSE PAYMENT METHOD</h3>
 
             <div style="display:flex; flex-direction:column; gap:10px;">
                 <label class="payment-choice">
                     <input type="radio" name="paymentMode" value="Online" checked />
                     <div>
-                        <strong style="display:block; font-size:14.5px; color:var(--on-surface);">Online Payment (UPI, Cards, NetBanking)</strong>
+                        <strong style="display:block; font-size:14.5px; color:var(--on-surface);">Online Payment (Cards, NetBanking)</strong>
                         <span class="text-muted" style="font-size:12.5px;">Instant seamless checkout via Razorpay</span>
                     </div>
                 </label>

@@ -24,6 +24,7 @@
 
     <!-- SQL Server provider. Swap for Npgsql.EntityFrameworkCore.PostgreSQL if you'd rather use PostgreSQL -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.0.10" />
 
     <!-- QR codes (wired up when you build Module 3) -->
     <PackageReference Include="QRCoder" Version="1.6.0" />

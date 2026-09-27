@@ -6,27 +6,26 @@
 }
 
 <div class="ticket-shell" style="text-align:center;">
-    <div class="ticket-shell" style="text-align:center;">
-        <div class="back-nav-row" style="justify-content:flex-start; text-align:left;">
-            @{
-                int sessionOrderCount = (int)(ViewBag.SessionOrderCount ?? 0);
-                var backUrl = sessionOrderCount > 1
-                    ? Url.Action("TableOrders", new { tableId = Model.TableID })
-                    : Url.Action("Menu", new { tableId = Model.TableID });
-                var backLabel = sessionOrderCount > 1 ? "Back to Your Orders" : "Back to Menu";
-            }
-            <a href="@backUrl" class="back-button">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                @backLabel
-            </a>
-        </div>
+    <div class="back-nav-row" style="justify-content:flex-start; text-align:left;">
+        @{
+            int sessionOrderCount = (int)(ViewBag.SessionOrderCount ?? 0);
+            var backUrl = sessionOrderCount > 1
+                ? Url.Action("TableOrders", new { tableId = Model.TableID })
+                : Url.Action("Menu", new { tableId = Model.TableID });
+            var backLabel = sessionOrderCount > 1 ? "Back to Your Orders" : "Back to Menu";
+        }
+        <a href="@backUrl" class="back-button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            @backLabel
+        </a>
+    </div>
 
-        <div class="ticket-brand">
-            <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "180" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
-        </div>
+    <div class="ticket-brand">
+        <partial name="_Logo" view-data='@new ViewDataDictionary(ViewData) { { "LogoWidth", "180" }, { "LogoClass", "brand-logo brand-logo--plain" } }' />
+    </div>
 
     <span class="eyebrow">Order Confirmation</span>
     <h1 class="mono" style="font-size:30px; margin:4px 0; font-weight:800; color:var(--on-surface);">#@Model.OrderID.ToString("D5")</h1>
@@ -118,29 +117,31 @@
                     </div>
                 </div>
             }
-            <p style="color:var(--error); font-size:14px; margin:14px 0 0; font-weight:600;">
+            <p id="status-message" style="color:var(--error); font-size:14px; margin:14px 0 0; font-weight:600;">
                 This order has been cancelled and can no longer be paid.
             </p>
         }
-        else if (Model.OrderStatus == "PendingPayment" && isPaymentRejected)
+        else if (Model.OrderStatus == "PendingPayment")
         {
-            <div style="background:#fef2f2; border:1px solid #fee2e2; border-radius:var(--radius-md); padding:12px 14px; margin-top:14px; text-align:left;">
-                <div style="display:flex; align-items:center; gap:8px; color:var(--error); font-weight:600; font-size:14px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="12"></line>
-                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                    </svg>
-                    Payment not verified
+            @if (isPaymentRejected)
+            {
+                <div style="background:#fef2f2; border:1px solid #fee2e2; border-radius:var(--radius-md); padding:12px 14px; margin-top:14px; text-align:left;">
+                    <div style="display:flex; align-items:center; gap:8px; color:var(--error); font-weight:600; font-size:14px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        Payment not verified
+                    </div>
+                    <p style="margin:6px 0 0; font-size:13.5px; color:var(--on-surface);">
+                        Reason: <strong>@(string.IsNullOrEmpty(latestPayment?.RejectionReason) ? "Staff could not verify the payment attempt." : latestPayment.RejectionReason)</strong>
+                    </p>
+                    <p style="margin:4px 0 0; font-size:12.5px; color:var(--on-surface-variant);">
+                        Your order is safely preserved. Please choose a payment method below to pay again.
+                    </p>
                 </div>
-                <p style="margin:6px 0 0; font-size:13.5px; color:var(--on-surface);">
-                    Reason: <strong>@(string.IsNullOrEmpty(latestPayment?.RejectionReason) ? "Staff could not verify the payment attempt." : latestPayment.RejectionReason)</strong>
-                </p>
-                <p style="margin:4px 0 0; font-size:12.5px; color:var(--on-surface-variant);">
-                    Your order is safely preserved. Please choose a payment method below to pay again.
-                </p>
-            </div>
-        }
+            }
             <p id="status-message" class="text-muted" style="font-size:13.5px; margin:10px 0 0;">
                 Your order is awaiting payment.
             </p>
@@ -180,8 +181,9 @@
                         <span>Please go to the Cash Manager / Front Desk and make your cash payment. Staff will verify and approve the payment from the admin system.</span>
                     }
                 </div>
+            </div>
             <p id="status-message" class="text-muted" style="font-size:13.5px; margin:10px 0 0;">
-                Your order is awaiting payment.
+                Your order is awaiting payment verification by staff.
             </p>
         }
         else if (Model.OrderStatus == "Approved")
@@ -206,12 +208,6 @@
         {
             <p id="status-message" style="font-size:13.5px; margin:10px 0 0; color:var(--on-surface-variant); font-weight:500;">
                 Your order has been served. Enjoy your meal!
-            </p>
-        }
-        else if (Model.OrderStatus == "Cancelled")
-        {
-            <p id="status-message" style="color:var(--error); font-size:14px; margin:14px 0 0; font-weight:600;">
-                Your order has been cancelled.
             </p>
         }
         else
@@ -242,7 +238,7 @@
                     <label style="display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid var(--outline-variant); border-radius:var(--radius-lg); cursor:pointer; background:var(--surface-container-lowest);">
                         <input type="radio" name="paymentMode" value="Online" checked style="accent-color:var(--primary);" />
                         <div>
-                            <strong style="display:block; font-size:14px; color:var(--on-surface);">Online Payment (UPI, Cards, NetBanking)</strong>
+                            <strong style="display:block; font-size:14px; color:var(--on-surface);">Online Payment (Cards, NetBanking)</strong>
                             <span class="text-muted" style="font-size:12px;">Instant confirmation via Razorpay</span>
                         </div>
                     </label>
@@ -375,7 +371,7 @@
 
     const statusMessages = {
         "PendingPayment": "Your order is awaiting payment.",
-        "AwaitingVerification": "Your order is awaiting payment.",
+        "AwaitingVerification": "Your order is awaiting payment verification by staff.",
         "Approved": "Order approved! The kitchen has received your ticket and will start preparation shortly.",
         "Preparing": "Your order is being prepared by the kitchen.",
         "Ready": "Your order is ready for serving.",

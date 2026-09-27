@@ -46,7 +46,7 @@ public class CustomerController : Controller
     {
         token ??= HttpContext.Session.GetString(TableSession.TokenKey(tableId));
 
-        if (string.IsNullOrEmpty(token) || !_qrCodeService.ValidateToken(tableId, token))
+        if (string.IsNullOrEmpty(token) || !await _qrCodeService.ValidateTokenAsync(tableId, token))
             return View("InvalidTable");
 
         var table = await _db.RestaurantTables.FindAsync(tableId);
@@ -177,9 +177,21 @@ public class CustomerController : Controller
 
     [HttpPost("table/{tableId:int}/checkout")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Checkout(int tableId, string paymentMode)
+    public async Task<IActionResult> Checkout(int tableId, string paymentMode, string? idempotencyKey = null)
     {
         if (!TableSessionValid(tableId)) return View("InvalidTable");
+
+        // Server-side double-submission / idempotency guard
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var existingOrderIdStr = HttpContext.Session.GetString($"checkout:processed:{tableId}:{idempotencyKey}");
+            if (int.TryParse(existingOrderIdStr, out var existingOrderId))
+            {
+                return paymentMode == PaymentModes.Online
+                    ? RedirectToAction("Checkout", "Payment", new { orderId = existingOrderId })
+                    : RedirectToAction(nameof(Status), new { orderId = existingOrderId });
+            }
+        }
 
         var table = await _db.RestaurantTables.FindAsync(tableId);
         if (table is null || !table.IsActive)
@@ -285,6 +297,11 @@ public class CustomerController : Controller
 
         ClearCart(tableId);
         AddSessionOrderId(tableId, order.OrderID);
+
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            HttpContext.Session.SetString($"checkout:processed:{tableId}:{idempotencyKey}", order.OrderID.ToString());
+        }
 
         if (paymentMode != PaymentModes.Online)
         {

@@ -247,8 +247,8 @@ public class AdminController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
-        var page = filter.Page > 0 ? filter.Page : 1;
+        var pageSize = Math.Clamp(filter.PageSize > 0 ? filter.PageSize : 10, 1, 100);
+        var page = Math.Max(1, filter.Page > 0 ? filter.Page : 1);
 
         var orders = await query
             .OrderByDescending(o => o.CreatedAt)
@@ -417,8 +417,8 @@ public class AdminController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
-        var page = filter.Page > 0 ? filter.Page : 1;
+        var pageSize = Math.Clamp(filter.PageSize > 0 ? filter.PageSize : 10, 1, 100);
+        var page = Math.Max(1, filter.Page > 0 ? filter.Page : 1);
 
         var payments = await query
             .OrderByDescending(p => p.VerificationTime ?? p.CreatedAt)
@@ -473,8 +473,8 @@ public class AdminController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
-        var page = filter.Page > 0 ? filter.Page : 1;
+        var pageSize = Math.Clamp(filter.PageSize > 0 ? filter.PageSize : 10, 1, 100);
+        var page = Math.Max(1, filter.Page > 0 ? filter.Page : 1);
 
         var tables = await query
             .OrderBy(t => t.TableNumber)
@@ -498,7 +498,7 @@ public class AdminController : Controller
 
         filter.TableQrUrls = tables.ToDictionary(
             t => t.TableID,
-            t => $"{baseUrl}/order/table/{t.TableID}?token={Uri.EscapeDataString(_qrCodeService.BuildToken(t.TableID))}"
+            t => $"{baseUrl}/order/table/{t.TableID}?token={Uri.EscapeDataString(_qrCodeService.BuildToken(t.TableID, t.QrTokenSalt))}"
         );
 
         return View(filter);
@@ -522,7 +522,7 @@ public class AdminController : Controller
         var table = await _db.RestaurantTables.FindAsync(tableId);
         if (table is null) return NotFound();
 
-        await _qrCodeService.GenerateForTableAsync(tableId);
+        await _qrCodeService.RegenerateForTableAsync(tableId);
 
         await WriteAuditLogAsync("RestaurantTables", tableId, "TableQrRegenerated", null,
             JsonSerializer.Serialize(new { table.TableNumber }));
@@ -567,6 +567,8 @@ public class AdminController : Controller
             ModelState.AddModelError(nameof(table.Capacity), "Capacity must be at least 1 seat.");
         }
 
+        ModelState.Remove(nameof(table.QRCodeData));
+
         if (!ModelState.IsValid)
         {
             return View(table);
@@ -577,6 +579,9 @@ public class AdminController : Controller
 
         _db.RestaurantTables.Add(table);
         await _db.SaveChangesAsync();
+
+        // Generate QR code with HMAC token immediately for the new table
+        await _qrCodeService.GenerateForTableAsync(table.TableID);
 
         await WriteAuditLogAsync("RestaurantTables", table.TableID, "TableCreated", null,
             JsonSerializer.Serialize(new { table.TableNumber, table.Capacity, table.IsActive }));
@@ -665,8 +670,8 @@ public class AdminController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
-        var page = filter.Page > 0 ? filter.Page : 1;
+        var pageSize = Math.Clamp(filter.PageSize > 0 ? filter.PageSize : 10, 1, 100);
+        var page = Math.Max(1, filter.Page > 0 ? filter.Page : 1);
 
         var items = await query
             .OrderBy(p => p.CreatedAt)
@@ -761,8 +766,8 @@ public class AdminController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var pageSize = filter.PageSize > 0 ? filter.PageSize : 10;
-        var page = filter.Page > 0 ? filter.Page : 1;
+        var pageSize = Math.Clamp(filter.PageSize > 0 ? filter.PageSize : 10, 1, 100);
+        var page = Math.Max(1, filter.Page > 0 ? filter.Page : 1);
 
         var logs = await query
             .OrderByDescending(a => a.Timestamp)

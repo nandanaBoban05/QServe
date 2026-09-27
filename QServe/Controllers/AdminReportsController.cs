@@ -85,6 +85,9 @@ public class AdminReportsController : Controller
     [HttpGet]
     public async Task<IActionResult> PaymentLog(DateTime? start, DateTime? end, int page = 1, int pageSize = 10)
     {
+        pageSize = Math.Clamp(pageSize > 0 ? pageSize : 10, 1, 100);
+        page = Math.Max(1, page > 0 ? page : 1);
+
         var (rangeStart, rangeEnd) = ResolveRange(start, end, defaultDays: 1);
         var allLogs = await _reports.GetPaymentVerificationLogAsync(rangeStart, rangeEnd);
         SetRangeViewBag(rangeStart, rangeEnd);
